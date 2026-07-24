@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { LogoutButton } from "@/components/logout-button";
@@ -15,7 +16,10 @@ export default async function ShellLayout({
       <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-neutral-200 dark:border-neutral-800">
         <div className="flex shrink-0 items-start justify-between border-b border-neutral-200 px-4 py-4 dark:border-neutral-800">
           <div>
-            <p className="font-semibold">QMS Trace Matrix</p>
+            <div className="flex items-center gap-2">
+              <Image src="/logo.png" alt="" width={24} height={24} className="shrink-0" />
+              <p className="font-semibold">QMS Trace Matrix</p>
+            </div>
             <p className="mt-1 text-xs text-neutral-500">
               {user.fullName} · {user.role}
             </p>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState } from "react";
 import { loginAction, type LoginState } from "./actions";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,7 +19,10 @@ export default function LoginPage() {
         action={formAction}
         className="w-full max-w-sm rounded-lg border border-neutral-200 p-6 dark:border-neutral-800"
       >
-        <h1 className="text-lg font-semibold">QMS Trace Matrix</h1>
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="" width={28} height={28} />
+          <h1 className="text-lg font-semibold">QMS Trace Matrix</h1>
+        </div>
         <p className="mt-1 text-sm text-neutral-500">Sign in to continue.</p>
 
         <div className="mt-4 flex flex-col gap-3">

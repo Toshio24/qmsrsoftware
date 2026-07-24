@@ -18,7 +18,7 @@ export default async function ShellLayout({
           <div>
             <div className="flex items-center gap-2">
               <Image src="/logo.png" alt="" width={24} height={24} className="shrink-0" />
-              <p className="font-semibold">QMS Trace Matrix</p>
+              <p className="font-semibold">Quality Management System Portal</p>
             </div>
             <p className="mt-1 text-xs text-neutral-500">
               {user.fullName} · {user.role}

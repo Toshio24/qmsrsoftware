@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "QMS Trace Matrix",
+  title: "Quality Management System Portal",
   description: "Quality Management System document trace matrix",
 };
 

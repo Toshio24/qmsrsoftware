@@ -21,7 +21,7 @@ export default function LoginPage() {
       >
         <div className="flex items-center gap-2">
           <Image src="/logo.png" alt="" width={28} height={28} />
-          <h1 className="text-lg font-semibold">QMS Trace Matrix</h1>
+          <h1 className="text-lg font-semibold">Quality Management System Portal</h1>
         </div>
         <p className="mt-1 text-sm text-neutral-500">Sign in to continue.</p>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
 import type { FieldConfig } from "@/lib/domain/itemTypes";
 
 export type ItemFormState = { error?: string };
@@ -80,8 +80,12 @@ function FieldInput({ field, defaultValue }: { field: FieldConfig; defaultValue?
     );
   }
 
-  const inputType =
-    field.kind === "date" ? "date" : field.kind === "number" ? "number" : field.kind === "url" ? "url" : "text";
+  // Note: field.kind === "url" intentionally renders as a plain text input,
+  // not type="url" — the browser's native URL validation requires a full
+  // scheme (https://...) and silently blocks submission otherwise, which is
+  // exactly the "it won't let me save the link" bug this avoids. The scheme
+  // is normalized server-side instead (see lib/domain/itemForm.ts).
+  const inputType = field.kind === "date" ? "date" : field.kind === "number" ? "number" : "text";
   const value = field.kind === "date" ? toDateInputValue(defaultValue) : ((defaultValue as string | number) ?? "");
 
   return (
@@ -91,6 +95,7 @@ function FieldInput({ field, defaultValue }: { field: FieldConfig; defaultValue?
         id={field.key}
         name={field.key}
         type={inputType}
+        inputMode={field.kind === "url" ? "url" : undefined}
         required={field.required}
         defaultValue={value}
         className={inputClass}
@@ -100,16 +105,62 @@ function FieldInput({ field, defaultValue }: { field: FieldConfig; defaultValue?
   );
 }
 
+/** Repeatable name+link rows, submitted as same-named fields
+ * (attachmentName[]/attachmentUrl[]) so the server can zip them by position. */
+function AttachmentFields() {
+  const [rowIds, setRowIds] = useState<number[]>([]);
+  const nextId = useRef(0);
+
+  return (
+    <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
+      <p className="text-sm font-medium">Attachments (optional)</p>
+      <p className="mt-1 text-xs text-neutral-500">
+        Reference links — Google Docs, etc. You can also add these later from the item&rsquo;s
+        page.
+      </p>
+
+      {rowIds.length > 0 && (
+        <div className="mt-3 flex flex-col gap-2">
+          {rowIds.map((id) => (
+            <div key={id} className="flex gap-2">
+              <input name="attachmentName" placeholder="Name" className={inputClass} />
+              <input name="attachmentUrl" placeholder="docs.google.com/…" className={inputClass} />
+              <button
+                type="button"
+                onClick={() => setRowIds((rows) => rows.filter((r) => r !== id))}
+                className="shrink-0 self-start text-xs text-neutral-500 underline-offset-2 hover:underline"
+                aria-label="Remove attachment row"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setRowIds((rows) => [...rows, nextId.current++])}
+        className="mt-3 text-sm underline-offset-2 hover:underline"
+      >
+        + Add attachment
+      </button>
+    </div>
+  );
+}
+
 export function ItemForm({
   fields,
   action,
   defaultValues,
   submitLabel,
+  allowAttachments = false,
 }: {
   fields: FieldConfig[];
   action: (prevState: ItemFormState, formData: FormData) => Promise<ItemFormState>;
   defaultValues?: Record<string, unknown>;
   submitLabel: string;
+  allowAttachments?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
@@ -118,6 +169,8 @@ export function ItemForm({
       {fields.map((field) => (
         <FieldInput key={field.key} field={field} defaultValue={defaultValues?.[field.key]} />
       ))}
+
+      {allowAttachments && <AttachmentFields />}
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 

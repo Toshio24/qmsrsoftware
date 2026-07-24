@@ -120,6 +120,8 @@ enum AuditAction {
   STATUS_CHANGE
   LINK_ADD
   LINK_REMOVE
+  ATTACHMENT_ADD
+  ATTACHMENT_REMOVE
   SIGNATURE
   LOGIN
   LOGIN_FAILED
@@ -146,12 +148,15 @@ model User {
 
   sessions Session[]
 
-  createdItems  TraceItem[]  @relation("ItemCreatedBy")
-  signatures    ESignature[]
-  linksCreated  TraceLink[]  @relation("LinkCreatedBy")
-  linksRemoved  TraceLink[]  @relation("LinkRemovedBy")
-  testsExecuted TestResult[] @relation("TestExecutedBy")
-  testsReviewed TestResult[] @relation("TestReviewedBy")
+  createdItems       TraceItem[]  @relation("ItemCreatedBy")
+  signatures         ESignature[]
+  linksCreated       TraceLink[]  @relation("LinkCreatedBy")
+  linksRemoved       TraceLink[]  @relation("LinkRemovedBy")
+  attachmentsAdded   Attachment[] @relation("AttachmentAddedBy")
+  attachmentsRemoved Attachment[] @relation("AttachmentRemovedBy")
+  foldersCreated     Folder[]
+  testsExecuted      TestResult[] @relation("TestExecutedBy")
+  testsReviewed      TestResult[] @relation("TestReviewedBy")
 
   userNeedVersions           UserNeedVersion[]
   designInputVersions        DesignInputVersion[]
@@ -200,6 +205,11 @@ model TraceItem {
   createdBy        User       @relation("ItemCreatedBy", fields: [createdById], references: [id])
   createdAt        DateTime   @default(now())
 
+  // Which folder (if any) this item is filed under, within its own item
+  // type's folder tree — see Folder below. Null means "unfiled" / root.
+  folderId String?
+  folder   Folder? @relation(fields: [folderId], references: [id])
+
   userNeedVersions           UserNeedVersion[]
   designInputVersions        DesignInputVersion[]
   designOutputVersions       DesignOutputVersion[]
@@ -223,9 +233,37 @@ model TraceItem {
   linksAsSource TraceLink[] @relation("LinkSource")
   linksAsTarget TraceLink[] @relation("LinkTarget")
 
+  attachments Attachment[]
+
   @@index([itemType])
   @@index([status])
+  @@index([folderId])
   @@map("trace_items")
+}
+
+// ---------- Folders (per item type, nestable) ----------
+// A lightweight organizational layer, independent of the version/link/audit
+// model above: users can group items of the same type into folders and
+// subfolders (e.g. "Verification Tests" > "Protocols"). Deleting a folder
+// never deletes its contents — items and subfolders move up to the parent
+// (or root) instead; see repository layer.
+
+model Folder {
+  id             String      @id @default(uuid())
+  itemType       ItemType
+  name           String
+  parentFolderId String?
+  parentFolder   Folder?     @relation("FolderParent", fields: [parentFolderId], references: [id])
+  subfolders     Folder[]    @relation("FolderParent")
+  items          TraceItem[]
+  status         LinkStatus  @default(ACTIVE)
+  createdById    String
+  createdBy      User        @relation(fields: [createdById], references: [id])
+  createdAt      DateTime    @default(now())
+
+  @@index([itemType])
+  @@index([parentFolderId])
+  @@map("folders")
 }
 
 // ---------- Per-type append-only version tables ----------
@@ -588,6 +626,30 @@ model TraceLink {
   @@index([sourceItemId])
   @@index([targetItemId])
   @@map("trace_links")
+}
+
+// ---------- Attachments (any TraceItem -> a named reference link) ----------
+// Informal reference links (e.g. a Google Doc), distinct from the
+// compliance-critical, version-scoped googleDocUrl/pdfSnapshotUrl fields on
+// ControlledDocumentVersion. Removed attachments are soft-deleted, same
+// pattern as TraceLink.
+
+model Attachment {
+  id          String     @id @default(uuid())
+  traceItemId String
+  traceItem   TraceItem  @relation(fields: [traceItemId], references: [id])
+  name        String
+  url         String
+  status      LinkStatus @default(ACTIVE)
+  addedById   String
+  addedBy     User       @relation("AttachmentAddedBy", fields: [addedById], references: [id])
+  addedAt     DateTime   @default(now())
+  removedById String?
+  removedBy   User?      @relation("AttachmentRemovedBy", fields: [removedById], references: [id])
+  removedAt   DateTime?
+
+  @@index([traceItemId])
+  @@map("attachments")
 }
 
 // ---------- Audit trail (append-only) ----------

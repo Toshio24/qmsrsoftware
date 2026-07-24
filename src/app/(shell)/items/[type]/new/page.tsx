@@ -21,6 +21,7 @@ export default async function NewItemPage({
         fields={config.fields}
         action={createItemAction.bind(null, slug)}
         submitLabel="Create"
+        allowAttachments
       />
     </div>
   );

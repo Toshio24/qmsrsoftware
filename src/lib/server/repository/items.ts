@@ -3,6 +3,7 @@ import { db } from "@/lib/server/db";
 import { ItemType, ItemStatus, AuditAction } from "@/generated/prisma/enums";
 import { getItemTypeConfig, deriveTitle } from "@/lib/domain/itemTypes";
 import { writeAuditLog, type Actor } from "@/lib/server/audit";
+import { createAttachmentInTx } from "./attachments";
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 type DbOrTx = typeof db | TxClient;
@@ -65,7 +66,12 @@ export function toPlainVersionData(version: VersionRow): Record<string, unknown>
   return rest;
 }
 
-export async function createItem(type: ItemType, data: Record<string, unknown>, actor: Actor) {
+export async function createItem(
+  type: ItemType,
+  data: Record<string, unknown>,
+  actor: Actor,
+  attachments: { name: string; url: string }[] = []
+) {
   const config = getItemTypeConfig(type);
   const title = deriveTitle(config, data);
 
@@ -92,6 +98,10 @@ export async function createItem(type: ItemType, data: Record<string, unknown>, 
       actor,
       afterState: { humanCode, title, versionNumber: 1, ...data },
     });
+
+    for (const attachment of attachments) {
+      await createAttachmentInTx(tx, traceItem.id, attachment.name, attachment.url, actor);
+    }
 
     return traceItem;
   });
@@ -143,9 +153,14 @@ export async function createItemVersion(
   });
 }
 
-export async function listItemsWithCurrentVersion(type: ItemType) {
+/**
+ * `folderId`: omit to return every item of the type regardless of folder
+ * (used by Board/Grid views, which ignore folders); pass `null` for only
+ * unfiled/root items; pass a folder id for only that folder's direct items.
+ */
+export async function listItemsWithCurrentVersion(type: ItemType, folderId?: string | null) {
   const items = await db.traceItem.findMany({
-    where: { itemType: type },
+    where: { itemType: type, ...(folderId !== undefined ? { folderId } : {}) },
     orderBy: { createdAt: "desc" },
     include: { createdBy: true },
   });

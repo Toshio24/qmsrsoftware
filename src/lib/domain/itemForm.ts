@@ -1,11 +1,17 @@
 import { z } from "zod";
 import type { FieldConfig, ItemTypeConfig } from "./itemTypes";
+import { normalizeUrl } from "./url";
 
 function zodForField(field: FieldConfig): z.ZodTypeAny {
   switch (field.kind) {
+    case "url": {
+      const base = z.string().transform(normalizeUrl);
+      return field.required
+        ? base.refine((v) => v.length > 0, { message: `${field.label} is required.` })
+        : base.optional();
+    }
     case "text":
     case "textarea":
-    case "url":
     case "select":
       return field.required
         ? z.string().min(1, `${field.label} is required.`)

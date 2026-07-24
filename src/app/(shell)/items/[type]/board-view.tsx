@@ -16,6 +16,7 @@ const COLUMNS: ItemStatus[] = [
 
 export function BoardView({ config, rows }: { config: ItemTypeConfig; rows: ItemRow[] }) {
   if (rows.length === 0) return <EmptyState config={config} />;
+  const Icon = config.icon;
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
@@ -34,7 +35,10 @@ export function BoardView({ config, rows }: { config: ItemTypeConfig; rows: Item
                   href={`/items/${config.slug}/${item.id}`}
                   className="block rounded-lg border border-neutral-200 bg-white p-3 text-sm shadow-sm hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
                 >
-                  <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
+                  <div className="flex items-center gap-1.5">
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                    <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
+                  </div>
                   <p className="mt-1 line-clamp-3">{item.title}</p>
                 </Link>
               ))}

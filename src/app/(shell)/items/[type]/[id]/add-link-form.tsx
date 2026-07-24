@@ -60,13 +60,10 @@ export function AddLinkForm({
         <label className="text-sm font-medium">Target item</label>
         <select
           name="targetItemId"
-          required
           defaultValue=""
           className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
         >
-          <option value="" disabled>
-            Select…
-          </option>
+          <option value="">— None —</option>
           {targetOptions.map((item) => (
             <option key={item.id} value={item.id}>
               [{item.typeLabel}] {item.humanCode} — {item.title} ({item.status})

@@ -129,6 +129,7 @@ enum AuditAction {
   PASSWORD_CHANGE
   EXPORT
   USER_ROLE_CHANGE
+  DELETE
 }
 
 // ---------- Users & sessions ----------

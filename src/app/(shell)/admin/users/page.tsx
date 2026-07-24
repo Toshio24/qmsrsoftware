@@ -1,18 +1,28 @@
+import Link from "next/link";
 import { db } from "@/lib/server/db";
 import { requireRole } from "@/lib/auth/session";
 import { UserRole } from "@/generated/prisma/enums";
 import { CreateUserForm } from "./create-user-form";
 import { RoleSelectForm } from "./role-select-form";
+import { DeleteUserForm } from "./delete-user-form";
 import {
   forcePasswordResetAction,
   toggleUserActiveAction,
   unlockAccountAction,
 } from "./actions";
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ showDeactivated?: string }>;
+}) {
   const currentUser = await requireRole([UserRole.ADMIN]);
+  const { showDeactivated: showDeactivatedParam } = await searchParams;
+  const showDeactivated = showDeactivatedParam === "1";
 
-  const users = await db.user.findMany({ orderBy: { createdAt: "asc" } });
+  const allUsers = await db.user.findMany({ orderBy: { createdAt: "asc" } });
+  const deactivatedCount = allUsers.filter((u) => !u.isActive).length;
+  const users = showDeactivated ? allUsers : allUsers.filter((u) => u.isActive);
 
   return (
     <div className="flex flex-col gap-6">
@@ -25,6 +35,19 @@ export default async function AdminUsersPage() {
       </div>
 
       <CreateUserForm />
+
+      {deactivatedCount > 0 && (
+        <div>
+          <Link
+            href={showDeactivated ? "/admin/users" : "/admin/users?showDeactivated=1"}
+            className="text-sm text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-400"
+          >
+            {showDeactivated
+              ? "Hide deactivated users"
+              : `Show deactivated users (${deactivatedCount})`}
+          </Link>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-800">
         <table className="w-full text-left text-sm">
@@ -108,6 +131,9 @@ export default async function AdminUsersPage() {
                             Unlock
                           </button>
                         </form>
+                      )}
+                      {!user.isActive && (
+                        <DeleteUserForm userId={user.id} username={user.username} />
                       )}
                     </div>
                   </td>

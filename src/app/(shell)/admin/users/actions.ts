@@ -120,6 +120,52 @@ export async function forcePasswordResetAction(formData: FormData) {
   revalidatePath("/admin/users");
 }
 
+export type DeleteUserState = { error?: string };
+
+export async function deleteUserAction(
+  _prevState: DeleteUserState,
+  formData: FormData
+): Promise<DeleteUserState> {
+  const admin = await requireRole([UserRole.ADMIN]);
+  const userId = formData.get("userId") as string;
+
+  if (userId === admin.id) {
+    return { error: "You can't delete your own account." };
+  }
+
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  if (user.isActive) {
+    return { error: "Deactivate this user before deleting them." };
+  }
+
+  try {
+    await db.$transaction(async (tx) => {
+      await writeAuditLog(tx, {
+        entityType: "User",
+        entityId: userId,
+        action: AuditAction.DELETE,
+        actor: admin,
+        beforeState: { username: user.username, role: user.role },
+        reasonForChange: "Admin deleted deactivated user",
+      });
+      await tx.session.deleteMany({ where: { userId } });
+      await tx.user.delete({ where: { id: userId } });
+    });
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code;
+    if (code === "P2003") {
+      return {
+        error:
+          "This user has trace items, signatures, links, or other activity on record and can't be permanently deleted — that history has to stay traceable. Leave them deactivated instead.",
+      };
+    }
+    throw err;
+  }
+
+  revalidatePath("/admin/users");
+  return {};
+}
+
 export async function unlockAccountAction(formData: FormData) {
   const admin = await requireRole([UserRole.ADMIN]);
   const userId = formData.get("userId") as string;

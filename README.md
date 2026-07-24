@@ -1,0 +1,31 @@
+# QMS Trace Matrix
+
+Web app for a medical device QMS: traceability (user needs, design inputs/outputs, risk analysis, V&V tests, controlled documents), plus supplier/vendor quality, CAPA, nonconformance & complaints, internal audits & management review, and training/equipment records — with 21 CFR Part 11-oriented audit trail and e-signature support.
+
+See `/Users/toshin/.claude/plans/compiled-weaving-graham.md` for the full design and phased build plan.
+
+## Local development
+
+1. Copy `.env.example` to `.env` and fill in `SESSION_SECRET` (a local `DATABASE_URL` is already set for the docker-compose Postgres below).
+2. Start local Postgres: `docker compose up -d db`
+3. Install dependencies: `npm install`
+4. Apply migrations: `npx prisma migrate dev`
+5. Seed the initial admin account: `npm run db:seed` (creates `admin` / `ChangeMe123!`, forced to change on first login)
+6. Run the app: `npm run dev`, then open [http://localhost:3000](http://localhost:3000)
+7. Check `/api/health` to confirm the app can reach the database.
+
+There's no public sign-up — an Admin creates every other account from **Admin → Users**.
+
+## Status
+
+- **Phase 0 (scaffolding)** — done: Next.js + TypeScript + Tailwind, Prisma schema for the full trace-item/version/link/audit/signature data model, local Postgres via Docker Compose.
+- **Phase 1 (auth & users)** — done: username/password login (argon2), DB-backed sessions with idle timeout + absolute expiry, account lockout after repeated failed logins, forced password reset flow, role-based access control (Admin/QA/Author/Approver/Auditor read-only), and an Admin → Users page to create accounts, change roles, deactivate/reactivate, force resets, and unlock accounts.
+- **Phase 2 (registry-driven CRUD)** — done: all 17 item types (the original 8 design-control types plus Supplier, Supplier Audit, CAPA, Nonconformance, Complaint, Internal Audit, Management Review, Training Record, Equipment) are driven by one generic engine (`src/lib/domain/itemTypes.ts`) instead of per-type pages — create, versioned edit, version history, and a simple (not yet signature-gated) status control all work the same way for every type. Every item-type list page has a **List / Board / Grid** view toggle (`?view=list|board|grid`). Also added an app-wide manual **light/dark theme toggle**.
+- **Phase 3 (trace links + matrix)** — done: every item detail page has a "Trace links" section to add/remove typed relationships (`src/lib/domain/linkRules.ts` defines which link types are valid between which item types) and see incoming/outgoing links on both ends. `/matrix` has a filterable **table view** and an interactive **flow-chart view** (React Flow + dagre auto-layout), both supporting a "focus item" mode (`?focus=<id>`) that shows just one item's full upstream/downstream chain. `/matrix/gaps` reports design-control coverage (e.g. design outputs with no linked verification test).
+- **Phase 4 (audit trail)** — done: every create, edit, status change, link add/remove, login/logout/failed-login, password change, and admin user action writes an `AuditLog` row (`src/lib/server/audit.ts`) in the same database transaction as the change itself, so a write can't commit without its audit entry. `/audit-log` (Admin/QA/Auditor read-only) is a searchable, filterable viewer. Underneath, Postgres itself enforces immutability regardless of caller: `BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers reject any attempt to modify the audit log, e-signatures, or any version-history table, and reject hard deletes of trace items/links — verified directly via `psql`, not just through the app.
+  - **Deferred to a later hardening pass**: full Postgres role separation (a restricted low-privilege role for the running app vs. an owner role for migrations). The trigger-based protection above already stops the app's own code (or a raw SQL statement) from tampering with regulated data; role separation is an additional layer worth setting up deliberately when configuring real production credentials (Neon), not something to bolt on with a hardcoded local password now.
+- **Phase 5 (e-signatures)** — done: moving a record to **Approved**, **Effective**, or **Rejected** now requires signing — re-entering your password (independently re-verified server-side, not just trusting the session), which is bound to the exact version being signed along with a SHA-256 hash of its contents and a snapshot of the attestation text. Only Approver/QA/Admin roles can sign; Author and Auditor-read-only can't. Controlled documents specifically can't be approved or made effective without a PDF snapshot attached (a live Google Doc isn't an immutable record — see caveats). There's also an optional "sign as reviewed" action that records a sign-off without changing status. Every signature is itself audit-logged. Trace links and the matrix now also show each linked item's status badge, so you can see at a glance whether something you're tracing to is still a draft or already effective.
+- **Phase 6 (exports)** — done: `/exports` offers CSV and PDF downloads of the full trace matrix (every item, its links, its status) and the coverage-gap report; every download writes its own `EXPORT` audit-log entry.
+- **UI/UX pass** (done alongside Phase 6, on request): the dashboard — a placeholder since Phase 0 — is now real: stat tiles for item counts by status, a design-control coverage meter, quick-create links, and a recent-activity feed pulled from the audit log. The sidebar nav got a per-item-type icon (`lucide-react`) and is now sticky/independently scrollable so it doesn't get lost with 17+ item types. Key routes (dashboard, item lists, matrix) show skeleton loading states instead of a blank page while data loads. The coverage meter component (severity-colored progress bar) is shared between the dashboard and the gaps report.
+
+See the plan doc for what's left (Phase 7 hardening: backups, login-lockout tuning, Postgres role separation).

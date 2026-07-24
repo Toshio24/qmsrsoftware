@@ -1,0 +1,641 @@
+// QMS Document Trace Matrix — data model.
+// See /Users/toshin/.claude/plans/compiled-weaving-graham.md for the design rationale.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum UserRole {
+  ADMIN
+  QA
+  AUTHOR
+  APPROVER
+  AUDITOR_READONLY
+}
+
+enum ItemType {
+  USER_NEED
+  DESIGN_INPUT
+  DESIGN_OUTPUT
+  RISK_ITEM
+  RISK_CONTROL
+  VERIFICATION_TEST
+  VALIDATION_TEST
+  CONTROLLED_DOCUMENT
+  SUPPLIER
+  SUPPLIER_AUDIT
+  CAPA
+  NONCONFORMANCE
+  COMPLAINT
+  INTERNAL_AUDIT
+  MANAGEMENT_REVIEW
+  TRAINING_RECORD
+  EQUIPMENT
+}
+
+enum ItemStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  EFFECTIVE
+  REJECTED
+  RETIRED
+  OBSOLETE
+}
+
+enum LinkType {
+  DERIVED_FROM
+  SATISFIES
+  VERIFIES
+  VALIDATES
+  MITIGATES
+  IMPLEMENTS
+  REFERENCES
+  RESULTED_FROM
+  ADDRESSES
+  SUPPLIED_BY
+  TRAINED_ON
+  USED_EQUIPMENT
+}
+
+enum LinkStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum RiskControlType {
+  DESIGN
+  PROTECTIVE
+  INFORMATION
+}
+
+enum SupplierApprovalStatus {
+  PENDING
+  APPROVED
+  CONDITIONAL
+  DISQUALIFIED
+}
+
+enum SupplierAuditType {
+  ONSITE
+  REMOTE
+  DOCUMENT_REVIEW
+}
+
+enum CapaType {
+  CORRECTIVE
+  PREVENTIVE
+}
+
+enum NonconformanceDisposition {
+  USE_AS_IS
+  REWORK
+  SCRAP
+  RETURN_TO_SUPPLIER
+}
+
+enum TestOutcome {
+  PASS
+  FAIL
+  BLOCKED
+}
+
+enum SignatureMeaning {
+  AUTHORED
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  STATUS_CHANGE
+  LINK_ADD
+  LINK_REMOVE
+  SIGNATURE
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_CHANGE
+  EXPORT
+  USER_ROLE_CHANGE
+}
+
+// ---------- Users & sessions ----------
+
+model User {
+  id                 String    @id @default(uuid())
+  username           String    @unique
+  fullName           String
+  email              String    @unique
+  passwordHash       String
+  role               UserRole
+  isActive           Boolean   @default(true)
+  forcePasswordReset Boolean   @default(false)
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+  createdAt          DateTime  @default(now())
+
+  sessions Session[]
+
+  createdItems  TraceItem[]  @relation("ItemCreatedBy")
+  signatures    ESignature[]
+  linksCreated  TraceLink[]  @relation("LinkCreatedBy")
+  linksRemoved  TraceLink[]  @relation("LinkRemovedBy")
+  testsExecuted TestResult[] @relation("TestExecutedBy")
+  testsReviewed TestResult[] @relation("TestReviewedBy")
+
+  userNeedVersions           UserNeedVersion[]
+  designInputVersions        DesignInputVersion[]
+  designOutputVersions       DesignOutputVersion[]
+  riskItemVersions           RiskItemVersion[]
+  riskControlVersions        RiskControlVersion[]
+  verificationTestVersions   VerificationTestVersion[]
+  validationTestVersions     ValidationTestVersion[]
+  controlledDocumentVersions ControlledDocumentVersion[]
+  supplierVersions           SupplierVersion[]
+  supplierAuditVersions      SupplierAuditVersion[]
+  capaVersions               CapaVersion[]
+  nonconformanceVersions     NonconformanceVersion[]
+  complaintVersions          ComplaintVersion[]
+  internalAuditVersions      InternalAuditVersion[]
+  managementReviewVersions   ManagementReviewVersion[]
+  trainingRecordVersions     TrainingRecordVersion[]
+  equipmentVersions          EquipmentVersion[]
+
+  @@map("users")
+}
+
+model Session {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+  lastActivityAt DateTime @default(now())
+  ipAddress      String?
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ---------- Trace item identity (class-table-inheritance root) ----------
+
+model TraceItem {
+  id               String     @id @default(uuid())
+  itemType         ItemType
+  humanCode        String     @unique
+  title            String
+  status           ItemStatus @default(DRAFT)
+  currentVersionNo Int        @default(1)
+  createdById      String
+  createdBy        User       @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime   @default(now())
+
+  userNeedVersions           UserNeedVersion[]
+  designInputVersions        DesignInputVersion[]
+  designOutputVersions       DesignOutputVersion[]
+  riskItemVersions           RiskItemVersion[]
+  riskControlVersions        RiskControlVersion[]
+  verificationTestVersions   VerificationTestVersion[]
+  validationTestVersions     ValidationTestVersion[]
+  controlledDocumentVersions ControlledDocumentVersion[]
+  supplierVersions           SupplierVersion[]
+  supplierAuditVersions      SupplierAuditVersion[]
+  capaVersions               CapaVersion[]
+  nonconformanceVersions     NonconformanceVersion[]
+  complaintVersions          ComplaintVersion[]
+  internalAuditVersions      InternalAuditVersion[]
+  managementReviewVersions   ManagementReviewVersion[]
+  trainingRecordVersions     TrainingRecordVersion[]
+  equipmentVersions          EquipmentVersion[]
+
+  testResults TestResult[]
+
+  linksAsSource TraceLink[] @relation("LinkSource")
+  linksAsTarget TraceLink[] @relation("LinkTarget")
+
+  @@index([itemType])
+  @@index([status])
+  @@map("trace_items")
+}
+
+// ---------- Per-type append-only version tables ----------
+// Rows here are never updated or deleted by the application — an edit always
+// inserts a new version and bumps TraceItem.currentVersionNo.
+
+model UserNeedVersion {
+  id            String    @id @default(uuid())
+  traceItemId   String
+  traceItem     TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber Int
+  needText      String
+  rationale     String?
+  createdById   String
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("user_need_versions")
+}
+
+model DesignInputVersion {
+  id                 String    @id @default(uuid())
+  traceItemId        String
+  traceItem          TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber      Int
+  requirementText    String
+  acceptanceCriteria String?
+  category           String?
+  createdById        String
+  createdBy          User      @relation(fields: [createdById], references: [id])
+  createdAt          DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("design_input_versions")
+}
+
+model DesignOutputVersion {
+  id                String    @id @default(uuid())
+  traceItemId       String
+  traceItem         TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber     Int
+  specText          String
+  implementationRef String?
+  createdById       String
+  createdBy         User      @relation(fields: [createdById], references: [id])
+  createdAt         DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("design_output_versions")
+}
+
+model RiskItemVersion {
+  id                  String    @id @default(uuid())
+  traceItemId         String
+  traceItem           TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber       Int
+  hazard              String
+  hazardousSituation  String
+  harm                String
+  severityInitial     Int
+  probabilityInitial  Int
+  rpnInitial          Int
+  severityResidual    Int?
+  probabilityResidual Int?
+  rpnResidual         Int?
+  createdById         String
+  createdBy           User      @relation(fields: [createdById], references: [id])
+  createdAt           DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("risk_item_versions")
+}
+
+model RiskControlVersion {
+  id                    String          @id @default(uuid())
+  traceItemId           String
+  traceItem             TraceItem       @relation(fields: [traceItemId], references: [id])
+  versionNumber         Int
+  controlType           RiskControlType
+  description           String
+  effectivenessVerified Boolean         @default(false)
+  createdById           String
+  createdBy             User            @relation(fields: [createdById], references: [id])
+  createdAt             DateTime        @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("risk_control_versions")
+}
+
+model VerificationTestVersion {
+  id                 String    @id @default(uuid())
+  traceItemId        String
+  traceItem          TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber      Int
+  procedure          String
+  acceptanceCriteria String
+  createdById        String
+  createdBy          User      @relation(fields: [createdById], references: [id])
+  createdAt          DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("verification_test_versions")
+}
+
+model ValidationTestVersion {
+  id                 String    @id @default(uuid())
+  traceItemId        String
+  traceItem          TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber      Int
+  procedure          String
+  acceptanceCriteria String
+  createdById        String
+  createdBy          User      @relation(fields: [createdById], references: [id])
+  createdAt          DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("validation_test_versions")
+}
+
+// Controlled documents: named on the platform, optionally linked to a live
+// Google Doc, with a required PDF snapshot at approval time (see plan §
+// "Important Caveats" — a live Google Doc is not an immutable record).
+model ControlledDocumentVersion {
+  id                String    @id @default(uuid())
+  traceItemId       String
+  traceItem         TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber     Int
+  docName           String
+  controlNumber     String
+  revision          String
+  googleDocUrl      String?
+  pdfSnapshotUrl    String?
+  effectiveDate     DateTime?
+  reviewCycleMonths Int?
+  createdById       String
+  createdBy         User      @relation(fields: [createdById], references: [id])
+  createdAt         DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("controlled_document_versions")
+}
+
+model SupplierVersion {
+  id                     String                 @id @default(uuid())
+  traceItemId            String
+  traceItem              TraceItem              @relation(fields: [traceItemId], references: [id])
+  versionNumber          Int
+  name                   String
+  category               String?
+  contactName            String?
+  contactEmail           String?
+  approvalStatus         SupplierApprovalStatus
+  qualificationDate      DateTime?
+  requalificationDueDate DateTime?
+  createdById            String
+  createdBy              User                   @relation(fields: [createdById], references: [id])
+  createdAt              DateTime               @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("supplier_versions")
+}
+
+model SupplierAuditVersion {
+  id                       String            @id @default(uuid())
+  traceItemId              String
+  traceItem                TraceItem         @relation(fields: [traceItemId], references: [id])
+  versionNumber            Int
+  auditDate                DateTime
+  auditType                SupplierAuditType
+  findingsSummary          String
+  score                    Int?
+  correctiveActionRequired Boolean           @default(false)
+  createdById              String
+  createdBy                User              @relation(fields: [createdById], references: [id])
+  createdAt                DateTime          @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("supplier_audit_versions")
+}
+
+model CapaVersion {
+  id                     String    @id @default(uuid())
+  traceItemId            String
+  traceItem              TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber          Int
+  capaType               CapaType
+  description            String
+  rootCause              String?
+  actionPlan             String?
+  dueDate                DateTime?
+  effectivenessCheckDate DateTime?
+  effectivenessResult    String?
+  createdById            String
+  createdBy              User      @relation(fields: [createdById], references: [id])
+  createdAt              DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("capa_versions")
+}
+
+model NonconformanceVersion {
+  id              String                     @id @default(uuid())
+  traceItemId     String
+  traceItem       TraceItem                  @relation(fields: [traceItemId], references: [id])
+  versionNumber   Int
+  description     String
+  detectedDate    DateTime
+  dispositionType NonconformanceDisposition?
+  disposition     String?
+  severity        String?
+  createdById     String
+  createdBy       User                       @relation(fields: [createdById], references: [id])
+  createdAt       DateTime                   @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("nonconformance_versions")
+}
+
+model ComplaintVersion {
+  id                   String    @id @default(uuid())
+  traceItemId          String
+  traceItem            TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber        Int
+  receivedDate         DateTime
+  description          String
+  isReportable         Boolean   @default(false)
+  investigationSummary String?
+  createdById          String
+  createdBy            User      @relation(fields: [createdById], references: [id])
+  createdAt            DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("complaint_versions")
+}
+
+model InternalAuditVersion {
+  id              String    @id @default(uuid())
+  traceItemId     String
+  traceItem       TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber   Int
+  auditDate       DateTime
+  scope           String
+  auditorName     String
+  findingsSummary String?
+  createdById     String
+  createdBy       User      @relation(fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("internal_audit_versions")
+}
+
+model ManagementReviewVersion {
+  id            String    @id @default(uuid())
+  traceItemId   String
+  traceItem     TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber Int
+  reviewDate    DateTime
+  attendees     String?
+  summary       String
+  actionItems   String?
+  createdById   String
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("management_review_versions")
+}
+
+model TrainingRecordVersion {
+  id            String    @id @default(uuid())
+  traceItemId   String
+  traceItem     TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber Int
+  traineeName   String
+  trainingTitle String
+  completedDate DateTime
+  expiresDate   DateTime?
+  method        String?
+  createdById   String
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("training_record_versions")
+}
+
+model EquipmentVersion {
+  id                 String    @id @default(uuid())
+  traceItemId        String
+  traceItem          TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber      Int
+  equipmentName      String
+  assetTag           String?
+  calibrationDate    DateTime?
+  calibrationDueDate DateTime?
+  calibratedBy       String?
+  certificateRef     String?
+  createdById        String
+  createdBy          User      @relation(fields: [createdById], references: [id])
+  createdAt          DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("equipment_versions")
+}
+
+// Atomic per-type counter backing human-readable codes (e.g. SUP-014).
+// Incremented inside the same transaction as item creation to avoid races.
+model ItemSequence {
+  itemType   ItemType @id
+  lastNumber Int      @default(0)
+
+  @@map("item_sequences")
+}
+
+// ---------- Test execution results (separate from the test definition) ----------
+
+model TestResult {
+  id                  String      @id @default(uuid())
+  traceItemId         String
+  traceItem           TraceItem   @relation(fields: [traceItemId], references: [id])
+  versionNumberTested Int
+  executedById        String
+  executedBy          User        @relation("TestExecutedBy", fields: [executedById], references: [id])
+  executedAt          DateTime    @default(now())
+  result              TestOutcome
+  actualResults       String?
+  attachmentUrl       String?
+  reviewedById        String?
+  reviewedBy          User?       @relation("TestReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt          DateTime?
+
+  @@index([traceItemId])
+  @@map("test_results")
+}
+
+// ---------- Trace links (any TraceItem -> any TraceItem, typed) ----------
+// Removed links are soft-deleted (status = REMOVED), never hard-deleted, so
+// history survives in the audit trail. Preventing duplicate ACTIVE links for
+// the same (source, target, linkType) is enforced in the repository layer,
+// not a DB constraint, since Postgres partial unique indexes aren't
+// expressible in the Prisma schema DSL.
+
+model TraceLink {
+  id           String     @id @default(uuid())
+  sourceItemId String
+  sourceItem   TraceItem  @relation("LinkSource", fields: [sourceItemId], references: [id])
+  targetItemId String
+  targetItem   TraceItem  @relation("LinkTarget", fields: [targetItemId], references: [id])
+  linkType     LinkType
+  status       LinkStatus @default(ACTIVE)
+  createdById  String
+  createdBy    User       @relation("LinkCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime   @default(now())
+  removedById  String?
+  removedBy    User?      @relation("LinkRemovedBy", fields: [removedById], references: [id])
+  removedAt    DateTime?
+
+  @@index([sourceItemId])
+  @@index([targetItemId])
+  @@map("trace_links")
+}
+
+// ---------- Audit trail (append-only) ----------
+// Immutability is enforced two ways: (1) every mutation goes through the
+// repository layer, which writes the domain change and this row in a single
+// transaction, and (2) a Postgres role with no UPDATE/DELETE grant on this
+// table plus a BEFORE UPDATE OR DELETE trigger, applied via raw migration SQL
+// (see prisma/migrations — not expressible in this schema file).
+
+model AuditLog {
+  id                    BigInt      @id @default(autoincrement())
+  entityType            String
+  entityId              String
+  action                AuditAction
+  actorUserId           String?
+  actorUsernameSnapshot String
+  timestamp             DateTime    @default(now())
+  beforeState           Json?
+  afterState            Json?
+  reasonForChange       String?
+  ipAddress             String?
+  requestId             String?
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@index([timestamp])
+  @@map("audit_log")
+}
+
+// ---------- Electronic signatures (21 CFR Part 11 §11.50/11.70/11.100) ----------
+// Bound to one specific immutable *Version row (entityId), never to "the
+// item" in general. Re-authentication at signing time is enforced in the
+// application layer (server independently re-verifies the password), not
+// representable in the schema.
+
+model ESignature {
+  id                      String           @id @default(uuid())
+  entityType              String
+  entityId                String
+  signerId                String
+  signer                  User             @relation(fields: [signerId], references: [id])
+  meaning                 SignatureMeaning
+  signedAt                DateTime         @default(now())
+  attestationTextSnapshot String
+  contentHash             String
+  ipAddress               String?
+
+  @@index([entityType, entityId])
+  @@index([signerId])
+  @@map("e_signatures")
+}

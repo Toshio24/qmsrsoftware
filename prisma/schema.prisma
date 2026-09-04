@@ -278,6 +278,8 @@ model UserNeedVersion {
   versionNumber Int
   needText      String
   rationale     String?
+  category      String?
+  source        String?
   createdById   String
   createdBy     User      @relation(fields: [createdById], references: [id])
   createdAt     DateTime  @default(now())

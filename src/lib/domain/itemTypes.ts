@@ -64,6 +64,13 @@ export const itemTypeRegistry: ItemTypeConfig[] = [
     fields: [
       { key: "needText", label: "Need", kind: "textarea", required: true },
       { key: "rationale", label: "Rationale", kind: "textarea" },
+      { key: "category", label: "Category", kind: "text" },
+      {
+        key: "source",
+        label: "Source",
+        kind: "text",
+        helpText: "Who this need came from, e.g. a surgeon, sales, or a regulatory requirement.",
+      },
     ],
   },
   {

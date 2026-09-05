@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
-import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
+import { getItemTypeConfigBySlug, itemTypeByType } from "@/lib/domain/itemTypes";
+import { getLinkRulesForSourceType } from "@/lib/domain/linkRules";
 import { getFolder, getFolderPath } from "@/lib/server/repository/folders";
+import { getCurrentVersionsForItems, listItemSummaries } from "@/lib/server/repository/items";
 import { requireUser } from "@/lib/auth/session";
 import { ItemForm } from "../item-form";
+import { LinkPickerFields } from "../link-picker-fields";
 import { createItemAction } from "./actions";
 
 export default async function NewItemPage({
@@ -30,6 +33,29 @@ export default async function NewItemPage({
   }
   const folderPath = folderId ? await getFolderPath(folderId) : [];
   const backHref = folderId ? `/items/${config.slug}?folder=${folderId}` : `/items/${config.slug}`;
+
+  const sourceRules = getLinkRulesForSourceType(config.type);
+  const targetTypesNeeded = Array.from(new Set(sourceRules.flatMap((r) => r.targetTypes)));
+  const candidates = targetTypesNeeded.length > 0 ? await listItemSummaries(targetTypesNeeded) : [];
+
+  const candidateItemsByType: Record<
+    string,
+    { id: string; humanCode: string; title: string; status: string }[]
+  > = {};
+  for (const c of candidates) {
+    (candidateItemsByType[c.itemType] ??= []).push(c);
+  }
+
+  const typeLabelByType: Record<string, string> = {};
+  const fieldsByType: Record<string, (typeof config.fields)> = {};
+  for (const [type, typeConfig] of itemTypeByType) {
+    typeLabelByType[type] = typeConfig.label;
+    fieldsByType[type] = typeConfig.fields;
+  }
+
+  const previewByItemId = Object.fromEntries(
+    (await getCurrentVersionsForItems(candidates)).entries()
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,6 +83,21 @@ export default async function NewItemPage({
         submitLabel="Create"
         allowAttachments
         cancelHref={backHref}
+        linkPicker={
+          sourceRules.length > 0 && (
+            <LinkPickerFields
+              rules={sourceRules.map((r) => ({
+                linkType: r.linkType,
+                label: r.label,
+                targetTypes: r.targetTypes,
+              }))}
+              candidateItemsByType={candidateItemsByType}
+              typeLabelByType={typeLabelByType}
+              fieldsByType={fieldsByType}
+              previewByItemId={previewByItemId}
+            />
+          )
+        }
       />
     </div>
   );

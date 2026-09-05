@@ -215,7 +215,14 @@ export async function listItemSummaries(types: ItemType[], excludeId?: string) {
       itemType: { in: types },
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
-    select: { id: true, humanCode: true, title: true, itemType: true, status: true },
+    select: {
+      id: true,
+      humanCode: true,
+      title: true,
+      itemType: true,
+      status: true,
+      currentVersionNo: true,
+    },
     orderBy: { humanCode: "asc" },
   });
 }

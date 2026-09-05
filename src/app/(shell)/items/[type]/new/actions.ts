@@ -5,6 +5,8 @@ import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
 import { parseItemForm } from "@/lib/domain/itemForm";
 import { createItem } from "@/lib/server/repository/items";
 import { getFolder } from "@/lib/server/repository/folders";
+import { addTraceLink } from "@/lib/server/repository/links";
+import type { LinkType } from "@/generated/prisma/enums";
 import { requireUser } from "@/lib/auth/session";
 import type { ItemFormState } from "../item-form";
 
@@ -39,5 +41,15 @@ export async function createItemAction(
 
   const attachments = extractAttachments(formData);
   const item = await createItem(config.type, parsed.data, user, attachments, targetFolderId);
+
+  const linkType = formData.get("linkType") as LinkType | null;
+  const targetItemId = formData.get("targetItemId") as string | null;
+  if (linkType && targetItemId) {
+    // Best-effort: the item itself was already created successfully, so a
+    // failed link (e.g. a race with someone else) shouldn't block the
+    // redirect — the user can add it from the item's page instead.
+    await addTraceLink(item.id, targetItemId, linkType, user);
+  }
+
   redirect(`/items/${config.slug}/${item.id}`);
 }

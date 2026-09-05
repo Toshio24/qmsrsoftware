@@ -157,6 +157,7 @@ export function ItemForm({
   submitLabel,
   allowAttachments = false,
   cancelHref,
+  linkPicker,
 }: {
   fields: FieldConfig[];
   action: (prevState: ItemFormState, formData: FormData) => Promise<ItemFormState>;
@@ -164,6 +165,7 @@ export function ItemForm({
   submitLabel: string;
   allowAttachments?: boolean;
   cancelHref?: string;
+  linkPicker?: React.ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
@@ -174,6 +176,7 @@ export function ItemForm({
       ))}
 
       {allowAttachments && <AttachmentFields />}
+      {linkPicker}
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 

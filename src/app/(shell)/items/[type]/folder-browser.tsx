@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Folder as FolderIcon, FolderPlus, Pencil, Trash2 } from "lucide-react";
+import { FilePlus, Folder as FolderIcon, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { useActionState } from "react";
 import { cn } from "@/lib/utils";
 import { statusBadgeClasses } from "@/lib/domain/formatField";
@@ -243,14 +243,27 @@ export function FolderBrowser({
           })}
         </nav>
 
-        <button
-          type="button"
-          onClick={() => setShowNewFolder((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
-        >
-          <FolderPlus className="h-4 w-4" />
-          New folder
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={
+              currentFolderId
+                ? `/items/${slug}/new?folder=${currentFolderId}`
+                : `/items/${slug}/new`
+            }
+            className="inline-flex items-center gap-1.5 rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
+          >
+            <FilePlus className="h-4 w-4" />
+            New {itemLabel}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowNewFolder((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
+          >
+            <FolderPlus className="h-4 w-4" />
+            New folder
+          </button>
+        </div>
       </div>
 
       {showNewFolder && (
@@ -280,7 +293,14 @@ export function FolderBrowser({
       {items.length === 0 && subfolders.length === 0 ? (
         <p className="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
           No {itemLabel.toLowerCase()} here yet.{" "}
-          <Link href={`/items/${slug}/new`} className="underline">
+          <Link
+            href={
+              currentFolderId
+                ? `/items/${slug}/new?folder=${currentFolderId}`
+                : `/items/${slug}/new`
+            }
+            className="underline"
+          >
             Create one
           </Link>{" "}
           or drag one in from another folder.

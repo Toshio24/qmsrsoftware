@@ -70,7 +70,8 @@ export async function createItem(
   type: ItemType,
   data: Record<string, unknown>,
   actor: Actor,
-  attachments: { name: string; url: string }[] = []
+  attachments: { name: string; url: string }[] = [],
+  folderId: string | null = null
 ) {
   const config = getItemTypeConfig(type);
   const title = deriveTitle(config, data);
@@ -84,7 +85,7 @@ export async function createItem(
     const humanCode = `${config.codePrefix}-${String(seq.lastNumber).padStart(3, "0")}`;
 
     const traceItem = await tx.traceItem.create({
-      data: { itemType: type, humanCode, title, createdById: actor.id },
+      data: { itemType: type, humanCode, title, createdById: actor.id, folderId },
     });
 
     await delegateFor(type, tx).create({

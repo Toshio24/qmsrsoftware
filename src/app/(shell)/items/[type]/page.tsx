@@ -87,7 +87,11 @@ export default async function ItemTypeListPage({
           </p>
         </div>
         <Link
-          href={`/items/${config.slug}/new`}
+          href={
+            currentFolderId
+              ? `/items/${config.slug}/new?folder=${currentFolderId}`
+              : `/items/${config.slug}/new`
+          }
           className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
         >
           New {config.label}

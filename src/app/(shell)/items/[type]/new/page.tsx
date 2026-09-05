@@ -4,7 +4,11 @@ import { notFound } from "next/navigation";
 import { getItemTypeConfigBySlug, itemTypeByType } from "@/lib/domain/itemTypes";
 import { getLinkRulesForSourceType } from "@/lib/domain/linkRules";
 import { getFolder, getFolderPath } from "@/lib/server/repository/folders";
-import { getCurrentVersionsForItems, listItemSummaries } from "@/lib/server/repository/items";
+import {
+  getCurrentVersionsForItems,
+  getDistinctFieldValues,
+  listItemSummaries,
+} from "@/lib/server/repository/items";
 import { requireUser } from "@/lib/auth/session";
 import { ItemForm } from "../item-form";
 import { LinkPickerFields } from "../link-picker-fields";
@@ -57,6 +61,13 @@ export default async function NewItemPage({
     (await getCurrentVersionsForItems(candidates)).entries()
   );
 
+  const suggestFields = config.fields.filter((f) => f.suggestFromExisting);
+  const fieldSuggestions = Object.fromEntries(
+    await Promise.all(
+      suggestFields.map(async (f) => [f.key, await getDistinctFieldValues(config.type, f.key)] as const)
+    )
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <Link
@@ -83,6 +94,7 @@ export default async function NewItemPage({
         submitLabel="Create"
         allowAttachments
         cancelHref={backHref}
+        fieldSuggestions={fieldSuggestions}
         linkPicker={
           sourceRules.length > 0 && (
             <LinkPickerFields

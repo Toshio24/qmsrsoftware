@@ -208,6 +208,23 @@ export async function countRetiredItems(type: ItemType, folderId?: string | null
   });
 }
 
+/**
+ * Distinct previously-entered values for one field on one item type's
+ * version table (e.g. every Category ever typed on a Design Input), for a
+ * "select an existing value or type a new one" suggestion list.
+ */
+export async function getDistinctFieldValues(type: ItemType, fieldKey: string): Promise<string[]> {
+  const rows = (await delegateFor(type).findMany({
+    where: { [fieldKey]: { not: null } },
+    select: { [fieldKey]: true },
+    distinct: [fieldKey],
+    orderBy: { [fieldKey]: "asc" },
+  })) as Record<string, string | null>[];
+  return rows
+    .map((r) => r[fieldKey])
+    .filter((v): v is string => typeof v === "string" && v.trim() !== "");
+}
+
 /** Lightweight item list for populating link-target pickers. */
 export async function listItemSummaries(types: ItemType[], excludeId?: string) {
   return db.traceItem.findMany({

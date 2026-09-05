@@ -38,6 +38,10 @@ export type FieldConfig = {
   required?: boolean;
   options?: SelectOption[];
   helpText?: string;
+  /** For "text" fields: offer previously-entered values for this field (on
+   * this item type) as suggestions, so users can reuse an existing category
+   * instead of retyping it exactly — while still allowing a new value. */
+  suggestFromExisting?: boolean;
 };
 
 export type ItemTypeConfig = {
@@ -94,7 +98,7 @@ export const itemTypeRegistry: ItemTypeConfig[] = [
     fields: [
       { key: "needText", label: "Need", kind: "textarea", required: true },
       { key: "rationale", label: "Rationale", kind: "textarea" },
-      { key: "category", label: "Category", kind: "text" },
+      { key: "category", label: "Category", kind: "text", suggestFromExisting: true },
       {
         key: "source",
         label: "Source",
@@ -114,7 +118,19 @@ export const itemTypeRegistry: ItemTypeConfig[] = [
     fields: [
       { key: "requirementText", label: "Requirement", kind: "textarea", required: true },
       { key: "acceptanceCriteria", label: "Acceptance criteria", kind: "textarea" },
-      { key: "category", label: "Category", kind: "text" },
+      { key: "category", label: "Category", kind: "text", suggestFromExisting: true },
+      {
+        key: "verificationMethod",
+        label: "Verification method",
+        kind: "select",
+        options: [
+          { value: "TEST", label: "Test" },
+          { value: "ANALYSIS", label: "Analysis" },
+          { value: "INSPECTION", label: "Inspection" },
+          { value: "DEMONSTRATION", label: "Demonstration" },
+        ],
+        helpText: "How this requirement will be verified — matches the method recorded on the linked Verification Test.",
+      },
     ],
   },
   {
@@ -218,7 +234,7 @@ export const itemTypeRegistry: ItemTypeConfig[] = [
     titleField: "name",
     fields: [
       { key: "name", label: "Name", kind: "text", required: true },
-      { key: "category", label: "Category", kind: "text" },
+      { key: "category", label: "Category", kind: "text", suggestFromExisting: true },
       { key: "contactName", label: "Contact name", kind: "text" },
       { key: "contactEmail", label: "Contact email", kind: "text" },
       {

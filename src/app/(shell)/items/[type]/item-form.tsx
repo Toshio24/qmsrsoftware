@@ -15,7 +15,15 @@ function toDateInputValue(value: unknown): string {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
 
-function FieldInput({ field, defaultValue }: { field: FieldConfig; defaultValue?: unknown }) {
+function FieldInput({
+  field,
+  defaultValue,
+  suggestions,
+}: {
+  field: FieldConfig;
+  defaultValue?: unknown;
+  suggestions?: string[];
+}) {
   if (field.kind === "boolean") {
     return (
       <div className="flex items-center gap-2">
@@ -88,6 +96,7 @@ function FieldInput({ field, defaultValue }: { field: FieldConfig; defaultValue?
   // is normalized server-side instead (see lib/domain/itemForm.ts).
   const inputType = field.kind === "date" ? "date" : field.kind === "number" ? "number" : "text";
   const value = field.kind === "date" ? toDateInputValue(defaultValue) : ((defaultValue as string | number) ?? "");
+  const datalistId = suggestions?.length ? `${field.key}-suggestions` : undefined;
 
   return (
     <div>
@@ -99,8 +108,17 @@ function FieldInput({ field, defaultValue }: { field: FieldConfig; defaultValue?
         inputMode={field.kind === "url" ? "url" : undefined}
         required={field.required}
         defaultValue={value}
+        list={datalistId}
+        autoComplete="off"
         className={inputClass}
       />
+      {datalistId && (
+        <datalist id={datalistId}>
+          {suggestions!.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      )}
       {field.helpText && <p className="mt-1 text-xs text-neutral-500">{field.helpText}</p>}
     </div>
   );
@@ -158,6 +176,7 @@ export function ItemForm({
   allowAttachments = false,
   cancelHref,
   linkPicker,
+  fieldSuggestions,
 }: {
   fields: FieldConfig[];
   action: (prevState: ItemFormState, formData: FormData) => Promise<ItemFormState>;
@@ -166,13 +185,19 @@ export function ItemForm({
   allowAttachments?: boolean;
   cancelHref?: string;
   linkPicker?: React.ReactNode;
+  fieldSuggestions?: Record<string, string[]>;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       {fields.map((field) => (
-        <FieldInput key={field.key} field={field} defaultValue={defaultValues?.[field.key]} />
+        <FieldInput
+          key={field.key}
+          field={field}
+          defaultValue={defaultValues?.[field.key]}
+          suggestions={fieldSuggestions?.[field.key]}
+        />
       ))}
 
       {allowAttachments && <AttachmentFields />}

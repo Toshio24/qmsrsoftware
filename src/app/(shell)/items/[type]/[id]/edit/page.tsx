@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
-import { getItemWithCurrentVersion } from "@/lib/server/repository/items";
+import { getDistinctFieldValues, getItemWithCurrentVersion } from "@/lib/server/repository/items";
 import { requireUser } from "@/lib/auth/session";
 import { ItemForm } from "../../item-form";
 import { createItemVersionAction } from "./actions";
@@ -22,6 +22,13 @@ export default async function EditItemPage({
   const { item, version } = result;
 
   const backHref = item.folderId ? `/items/${slug}?folder=${item.folderId}` : `/items/${slug}`;
+
+  const suggestFields = config.fields.filter((f) => f.suggestFromExisting);
+  const fieldSuggestions = Object.fromEntries(
+    await Promise.all(
+      suggestFields.map(async (f) => [f.key, await getDistinctFieldValues(config.type, f.key)] as const)
+    )
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -47,6 +54,7 @@ export default async function EditItemPage({
         defaultValues={version}
         submitLabel="Save new version"
         cancelHref={backHref}
+        fieldSuggestions={fieldSuggestions}
       />
     </div>
   );

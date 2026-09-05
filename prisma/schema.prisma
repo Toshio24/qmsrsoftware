@@ -296,6 +296,7 @@ model DesignInputVersion {
   requirementText    String
   acceptanceCriteria String?
   category           String?
+  verificationMethod String?
   createdById        String
   createdBy          User      @relation(fields: [createdById], references: [id])
   createdAt          DateTime  @default(now())

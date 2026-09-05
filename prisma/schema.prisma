@@ -584,6 +584,22 @@ model ItemSequence {
   @@map("item_sequences")
 }
 
+// Design Input only: humanCode there is "DI-<categoryNumber>.<itemNumber>"
+// instead of the flat per-type counter every other item type uses (see
+// createItem() in repository/items.ts) — categoryNumber is assigned the
+// first time a given category name is used for a Design Input, in order of
+// first use, and itemNumber counts up within that category.
+model CategorySequence {
+  itemType       ItemType
+  categoryName   String
+  categoryNumber Int
+  lastItemNumber Int      @default(0)
+
+  @@id([itemType, categoryName])
+  @@unique([itemType, categoryNumber])
+  @@map("category_sequences")
+}
+
 // ---------- Test execution results (separate from the test definition) ----------
 
 model TestResult {

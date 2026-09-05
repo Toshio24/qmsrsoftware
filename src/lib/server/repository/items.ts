@@ -66,6 +66,40 @@ export function toPlainVersionData(version: VersionRow): Record<string, unknown>
   return rest;
 }
 
+/**
+ * Design Input only: "DI-<categoryNumber>.<itemNumber>" instead of the flat
+ * per-type counter — categoryNumber is assigned in order of first use of
+ * that category name (uncategorized items share one "Uncategorized"
+ * bucket), itemNumber counts up within it. See CategorySequence in schema.
+ */
+async function nextDesignInputCode(tx: TxClient, category: unknown): Promise<string> {
+  const categoryName = (typeof category === "string" ? category.trim() : "") || "Uncategorized";
+
+  const existing = await tx.categorySequence.findUnique({
+    where: { itemType_categoryName: { itemType: ItemType.DESIGN_INPUT, categoryName } },
+  });
+  if (existing) {
+    const updated = await tx.categorySequence.update({
+      where: { itemType_categoryName: { itemType: ItemType.DESIGN_INPUT, categoryName } },
+      data: { lastItemNumber: { increment: 1 } },
+    });
+    return `DI-${updated.categoryNumber}.${updated.lastItemNumber}`;
+  }
+
+  const categoryCount = await tx.categorySequence.count({
+    where: { itemType: ItemType.DESIGN_INPUT },
+  });
+  const created = await tx.categorySequence.create({
+    data: {
+      itemType: ItemType.DESIGN_INPUT,
+      categoryName,
+      categoryNumber: categoryCount + 1,
+      lastItemNumber: 1,
+    },
+  });
+  return `DI-${created.categoryNumber}.${created.lastItemNumber}`;
+}
+
 export async function createItem(
   type: ItemType,
   data: Record<string, unknown>,
@@ -77,12 +111,17 @@ export async function createItem(
   const title = deriveTitle(config, data);
 
   return db.$transaction(async (tx) => {
-    const seq = await tx.itemSequence.upsert({
-      where: { itemType: type },
-      create: { itemType: type, lastNumber: 1 },
-      update: { lastNumber: { increment: 1 } },
-    });
-    const humanCode = `${config.codePrefix}-${String(seq.lastNumber).padStart(3, "0")}`;
+    const humanCode =
+      type === ItemType.DESIGN_INPUT
+        ? await nextDesignInputCode(tx, data.category)
+        : await (async () => {
+            const seq = await tx.itemSequence.upsert({
+              where: { itemType: type },
+              create: { itemType: type, lastNumber: 1 },
+              update: { lastNumber: { increment: 1 } },
+            });
+            return `${config.codePrefix}-${String(seq.lastNumber).padStart(3, "0")}`;
+          })();
 
     const traceItem = await tx.traceItem.create({
       data: { itemType: type, humanCode, title, createdById: actor.id, folderId },

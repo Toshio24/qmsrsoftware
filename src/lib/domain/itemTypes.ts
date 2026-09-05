@@ -444,5 +444,5 @@ export function getEntityLabel(entityType: string): string {
 export function deriveTitle(config: ItemTypeConfig, data: Record<string, unknown>): string {
   const raw = data[config.titleField];
   const text = typeof raw === "string" ? raw : String(raw ?? "");
-  return text.length > 120 ? `${text.slice(0, 117)}...` : text || config.label;
+  return text || config.label;
 }

@@ -80,10 +80,10 @@ export default async function ItemTypeListPage({
         currentFolderId={currentFolderId}
         folderPath={folderPath}
         subfolders={subfolders}
-        items={rows.map(({ item }) => ({
+        items={rows.map(({ item, version }) => ({
           id: item.id,
           humanCode: item.humanCode,
-          title: item.title,
+          title: (version?.[config.titleField] as string | undefined) || item.title,
           status: item.status,
         }))}
         allFoldersFlat={allFoldersFlat}

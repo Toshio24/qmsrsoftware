@@ -24,12 +24,12 @@ export function BoardView({ config, rows }: { config: ItemTypeConfig; rows: Item
         const columnRows = rows.filter(({ item }) => item.status === status);
         if (columnRows.length === 0) return null;
         return (
-          <div key={status} className="w-64 shrink-0">
+          <div key={status} className="w-96 shrink-0">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
               {status.replace("_", " ")} ({columnRows.length})
             </p>
             <div className="flex flex-col gap-2">
-              {columnRows.map(({ item }) => (
+              {columnRows.map(({ item, version }) => (
                 <Link
                   key={item.id}
                   href={`/items/${config.slug}/${item.id}`}
@@ -39,7 +39,9 @@ export function BoardView({ config, rows }: { config: ItemTypeConfig; rows: Item
                     <Icon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
                     <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
                   </div>
-                  <p className="mt-1 line-clamp-3">{item.title}</p>
+                  <p className="mt-1 whitespace-pre-wrap">
+                    {(version?.[config.titleField] as string | undefined) || item.title}
+                  </p>
                 </Link>
               ))}
             </div>

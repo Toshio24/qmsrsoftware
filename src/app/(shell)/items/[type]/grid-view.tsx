@@ -10,7 +10,7 @@ export function GridView({ config, rows }: { config: ItemTypeConfig; rows: ItemR
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {rows.map(({ item }) => (
+      {rows.map(({ item, version }) => (
         <Link
           key={item.id}
           href={`/items/${config.slug}/${item.id}`}
@@ -25,7 +25,9 @@ export function GridView({ config, rows }: { config: ItemTypeConfig; rows: ItemR
             </span>
           </div>
           <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
-          <p className="line-clamp-3 text-sm">{item.title}</p>
+          <p className="whitespace-pre-wrap text-sm">
+            {(version?.[config.titleField] as string | undefined) || item.title}
+          </p>
         </Link>
       ))}
     </div>

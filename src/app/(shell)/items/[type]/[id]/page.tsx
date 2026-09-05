@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, GitBranch } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
 import { getItemWithCurrentVersion } from "@/lib/server/repository/items";
@@ -24,9 +24,18 @@ export default async function ItemDetailPage({
   if (!result || !result.version) notFound();
   const { item, version } = result;
   const Icon = config.icon;
+  const backHref = item.folderId ? `/items/${slug}?folder=${item.folderId}` : `/items/${slug}`;
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
+      <Link
+        href={backHref}
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 hover:underline dark:hover:text-neutral-300"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to {config.pluralLabel}
+      </Link>
+
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900">

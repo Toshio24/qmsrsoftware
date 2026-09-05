@@ -318,9 +318,11 @@ export function FolderBrowser({
           <table className="w-full text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
               <tr>
-                <th className="px-3 py-2">Code</th>
+                <th className="whitespace-nowrap px-3 py-2">Code</th>
                 <th className="px-3 py-2">Title</th>
-                {linkedColumnLabel && <th className="px-3 py-2">{linkedColumnLabel}</th>}
+                {linkedColumnLabel && (
+                  <th className="whitespace-nowrap px-3 py-2">{linkedColumnLabel}</th>
+                )}
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Folder</th>
               </tr>
@@ -334,7 +336,7 @@ export function FolderBrowser({
                   className="cursor-move border-b border-neutral-100 last:border-0 hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900"
                   title="Drag onto a folder or breadcrumb to file it"
                 >
-                  <td className="px-3 py-2 font-mono text-xs">
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
                     <Link href={`/items/${slug}/${item.id}`} className="hover:underline">
                       {item.humanCode}
                     </Link>
@@ -345,7 +347,7 @@ export function FolderBrowser({
                     </Link>
                   </td>
                   {linkedColumnLabel && (
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
                       {(() => {
                         const linked = linkedItemsByItemId?.[item.id] ?? [];
                         if (linked.length === 0) return <span className="text-neutral-400">—</span>;

@@ -220,6 +220,38 @@ export async function listItemSummaries(types: ItemType[], excludeId?: string) {
   });
 }
 
+/**
+ * Batched current-version content lookup for a set of items of possibly
+ * different types (e.g. the "other side" of each trace link on an item's
+ * detail page) — one query per item type involved, not one per item.
+ */
+export async function getCurrentVersionsForItems(
+  items: { id: string; itemType: ItemType; currentVersionNo: number }[]
+): Promise<Map<string, Record<string, unknown>>> {
+  const byType = new Map<ItemType, typeof items>();
+  for (const item of items) {
+    const bucket = byType.get(item.itemType);
+    if (bucket) bucket.push(item);
+    else byType.set(item.itemType, [item]);
+  }
+
+  const result = new Map<string, Record<string, unknown>>();
+  await Promise.all(
+    Array.from(byType.entries()).map(async ([type, typeItems]) => {
+      const versions = (await delegateFor(type).findMany({
+        where: { traceItemId: { in: typeItems.map((i) => i.id) } },
+      })) as VersionRow[];
+      const versionNoById = new Map(typeItems.map((i) => [i.id, i.currentVersionNo]));
+      for (const v of versions) {
+        if (v.versionNumber === versionNoById.get(v.traceItemId)) {
+          result.set(v.traceItemId, toPlainVersionData(v));
+        }
+      }
+    })
+  );
+  return result;
+}
+
 export async function getItemWithCurrentVersion(type: ItemType, traceItemId: string) {
   const item = await db.traceItem.findUnique({
     where: { id: traceItemId },

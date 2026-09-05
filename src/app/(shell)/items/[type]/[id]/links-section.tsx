@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { getLinksForItem } from "@/lib/server/repository/links";
-import { listItemSummaries } from "@/lib/server/repository/items";
+import { getCurrentVersionsForItems, listItemSummaries } from "@/lib/server/repository/items";
 import { getLinkRulesForSourceType, linkRules } from "@/lib/domain/linkRules";
 import { getItemTypeConfig, itemTypeByType } from "@/lib/domain/itemTypes";
-import { statusBadgeClasses } from "@/lib/domain/formatField";
+import { formatFieldValue, statusBadgeClasses } from "@/lib/domain/formatField";
 import type { ItemType } from "@/generated/prisma/enums";
 import { AddLinkForm } from "./add-link-form";
 import { addLinkAction, removeLinkAction } from "./link-actions";
@@ -25,6 +25,14 @@ export async function LinksSection({
     getLinksForItem(traceItemId),
     Promise.resolve(getLinkRulesForSourceType(itemType)),
   ]);
+
+  const previewByItemId = await getCurrentVersionsForItems(
+    links.map((link) => ({
+      id: link.otherItem.id,
+      itemType: link.otherItem.itemType,
+      currentVersionNo: link.otherItem.currentVersionNo,
+    }))
+  );
 
   const targetTypesNeeded = Array.from(new Set(sourceRules.flatMap((r) => r.targetTypes)));
   const candidates =
@@ -61,38 +69,60 @@ export async function LinksSection({
               link.direction === "outgoing"
                 ? `This item ${linkLabelFor(link.linkType)}`
                 : `${link.otherItem.humanCode} ${linkLabelFor(link.linkType)} this item`;
+            const preview = previewByItemId.get(link.otherItem.id);
             return (
               <li
                 key={link.id}
-                className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
+                className="rounded-md border border-neutral-200 dark:border-neutral-800"
               >
-                <div>
-                  <p className="text-neutral-500">{description}</p>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/items/${otherConfig.slug}/${link.otherItem.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      [{otherConfig.label}] {link.otherItem.humanCode} — {link.otherItem.title}
-                    </Link>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${statusBadgeClasses(link.otherItem.status)}`}
-                    >
-                      {link.otherItem.status}
-                    </span>
+                <div className="flex items-center justify-between px-3 py-2 text-sm">
+                  <div>
+                    <p className="text-neutral-500">{description}</p>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/items/${otherConfig.slug}/${link.otherItem.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        [{otherConfig.label}] {link.otherItem.humanCode} — {link.otherItem.title}
+                      </Link>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs ${statusBadgeClasses(link.otherItem.status)}`}
+                      >
+                        {link.otherItem.status}
+                      </span>
+                    </div>
                   </div>
+                  <form action={removeLinkAction}>
+                    <input type="hidden" name="linkId" value={link.id} />
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="traceItemId" value={traceItemId} />
+                    <button
+                      type="submit"
+                      className="text-xs text-neutral-500 underline-offset-2 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </form>
                 </div>
-                <form action={removeLinkAction}>
-                  <input type="hidden" name="linkId" value={link.id} />
-                  <input type="hidden" name="slug" value={slug} />
-                  <input type="hidden" name="traceItemId" value={traceItemId} />
-                  <button
-                    type="submit"
-                    className="text-xs text-neutral-500 underline-offset-2 hover:underline"
-                  >
-                    Remove
-                  </button>
-                </form>
+                {preview && (
+                  <details className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-800">
+                    <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300">
+                      Preview {link.otherItem.humanCode}
+                    </summary>
+                    <dl className="mt-2 flex flex-col gap-2">
+                      {otherConfig.fields.map((field) => (
+                        <div key={field.key}>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                            {field.label}
+                          </dt>
+                          <dd className="mt-0.5 whitespace-pre-wrap text-sm">
+                            {formatFieldValue(field, preview[field.key])}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </details>
+                )}
               </li>
             );
           })}

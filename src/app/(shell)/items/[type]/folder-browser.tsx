@@ -158,6 +158,34 @@ function FolderCard({
   );
 }
 
+type SortColumn = "code" | "title" | "status";
+
+function SortableHeader({
+  label,
+  column,
+  href,
+  activeColumn,
+  activeDir,
+}: {
+  label: string;
+  column: SortColumn;
+  href: string;
+  activeColumn: SortColumn | null;
+  activeDir: "asc" | "desc";
+}) {
+  const isActive = activeColumn === column;
+  return (
+    <th className="whitespace-nowrap px-3 py-2">
+      <Link href={href} className="inline-flex items-center gap-1 hover:text-neutral-700 dark:hover:text-neutral-300">
+        {label}
+        <span className={cn("text-[10px]", !isActive && "opacity-30")}>
+          {isActive ? (activeDir === "asc" ? "▲" : "▼") : "▲"}
+        </span>
+      </Link>
+    </th>
+  );
+}
+
 export function FolderBrowser({
   slug,
   itemLabel,
@@ -170,6 +198,9 @@ export function FolderBrowser({
   linkedColumnLabel,
   linkedColumnSlug,
   linkedItemsByItemId,
+  sortColumn = null,
+  sortDir = "asc",
+  sortHrefs,
 }: {
   slug: string;
   itemLabel: string;
@@ -184,6 +215,12 @@ export function FolderBrowser({
   /** slug for the linked item type, to build links to it (e.g. "user-needs"). */
   linkedColumnSlug?: string;
   linkedItemsByItemId?: Record<string, { id: string; humanCode: string }[]>;
+  sortColumn?: SortColumn | null;
+  sortDir?: "asc" | "desc";
+  /** Precomputed hrefs (server-built — functions can't cross to a Client
+   * Component) for each sortable column, toggling direction when clicked
+   * again on the already-active column. Omit to hide sort controls. */
+  sortHrefs?: Record<SortColumn, string>;
 }) {
   const router = useRouter();
   const [dragOverTarget, setDragOverTarget] = useState<string | "root" | null>(null);
@@ -318,12 +355,42 @@ export function FolderBrowser({
           <table className="w-full text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
               <tr>
-                <th className="whitespace-nowrap px-3 py-2">Code</th>
-                <th className="px-3 py-2">Title</th>
+                {sortHrefs ? (
+                  <SortableHeader
+                    label="Code"
+                    column="code"
+                    href={sortHrefs.code}
+                    activeColumn={sortColumn}
+                    activeDir={sortDir}
+                  />
+                ) : (
+                  <th className="whitespace-nowrap px-3 py-2">Code</th>
+                )}
+                {sortHrefs ? (
+                  <SortableHeader
+                    label="Title"
+                    column="title"
+                    href={sortHrefs.title}
+                    activeColumn={sortColumn}
+                    activeDir={sortDir}
+                  />
+                ) : (
+                  <th className="px-3 py-2">Title</th>
+                )}
                 {linkedColumnLabel && (
                   <th className="whitespace-nowrap px-3 py-2">{linkedColumnLabel}</th>
                 )}
-                <th className="px-3 py-2">Status</th>
+                {sortHrefs ? (
+                  <SortableHeader
+                    label="Status"
+                    column="status"
+                    href={sortHrefs.status}
+                    activeColumn={sortColumn}
+                    activeDir={sortDir}
+                  />
+                ) : (
+                  <th className="px-3 py-2">Status</th>
+                )}
                 <th className="px-3 py-2">Folder</th>
               </tr>
             </thead>

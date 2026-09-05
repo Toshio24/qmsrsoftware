@@ -20,12 +20,15 @@ import { FolderBrowser } from "./folder-browser";
 const VIEW_MODES = ["list", "board", "grid"] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
 
+const SORT_COLUMNS = ["code", "title", "status"] as const;
+type SortColumn = (typeof SORT_COLUMNS)[number];
+
 export default async function ItemTypeListPage({
   params,
   searchParams,
 }: {
   params: Promise<{ type: string }>;
-  searchParams: Promise<{ view?: string; folder?: string; retired?: string }>;
+  searchParams: Promise<{ view?: string; folder?: string; retired?: string; sort?: string; dir?: string }>;
 }) {
   await requireUser();
 
@@ -33,11 +36,21 @@ export default async function ItemTypeListPage({
   const config = getItemTypeConfigBySlug(slug);
   if (!config) notFound();
 
-  const { view: viewParam, folder: folderParam, retired: retiredParam } = await searchParams;
+  const {
+    view: viewParam,
+    folder: folderParam,
+    retired: retiredParam,
+    sort: sortParam,
+    dir: dirParam,
+  } = await searchParams;
   const view: ViewMode = (VIEW_MODES as readonly string[]).includes(viewParam ?? "")
     ? (viewParam as ViewMode)
     : "list";
   const showRetired = retiredParam === "1";
+  const sortColumn: SortColumn | null = (SORT_COLUMNS as readonly string[]).includes(sortParam ?? "")
+    ? (sortParam as SortColumn)
+    : null;
+  const sortDir: "asc" | "desc" = dirParam === "desc" ? "desc" : "asc";
 
   // A folder id from another item type (or a stale/bad one) is treated as
   // root rather than erroring — folders are scoped per item type.
@@ -72,6 +85,35 @@ export default async function ItemTypeListPage({
       ? await getLinkedTargetsByType(rows.map(({ item }) => item.id), ItemType.USER_NEED)
       : new Map<string, { id: string; humanCode: string }[]>();
 
+    let listItems = rows.map(({ item, version }) => ({
+      id: item.id,
+      humanCode: item.humanCode,
+      title: (version?.[config.titleField] as string | undefined) || item.title,
+      status: item.status,
+    }));
+
+    if (sortColumn) {
+      const key = sortColumn === "code" ? "humanCode" : sortColumn;
+      listItems = [...listItems].sort((a, b) => {
+        const cmp = a[key].localeCompare(b[key], undefined, { numeric: true, sensitivity: "base" });
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
+
+    const sortHrefFor = (column: SortColumn) => {
+      const p = new URLSearchParams();
+      if (currentFolderId) p.set("folder", currentFolderId);
+      if (showRetired) p.set("retired", "1");
+      p.set("sort", column);
+      p.set("dir", sortColumn === column && sortDir === "asc" ? "desc" : "asc");
+      return `/items/${config.slug}?${p.toString()}`;
+    };
+    const sortHrefs: Record<SortColumn, string> = {
+      code: sortHrefFor("code"),
+      title: sortHrefFor("title"),
+      status: sortHrefFor("status"),
+    };
+
     listContent = (
       <FolderBrowser
         slug={config.slug}
@@ -80,16 +122,14 @@ export default async function ItemTypeListPage({
         currentFolderId={currentFolderId}
         folderPath={folderPath}
         subfolders={subfolders}
-        items={rows.map(({ item, version }) => ({
-          id: item.id,
-          humanCode: item.humanCode,
-          title: (version?.[config.titleField] as string | undefined) || item.title,
-          status: item.status,
-        }))}
+        items={listItems}
         allFoldersFlat={allFoldersFlat}
         linkedColumnLabel={linksToUserNeeds ? itemTypeByType.get(ItemType.USER_NEED)?.label : undefined}
         linkedColumnSlug={itemTypeByType.get(ItemType.USER_NEED)?.slug}
         linkedItemsByItemId={Object.fromEntries(linkedUserNeedsByItemId)}
+        sortColumn={sortColumn}
+        sortDir={sortDir}
+        sortHrefs={sortHrefs}
       />
     );
   } else {

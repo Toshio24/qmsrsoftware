@@ -54,6 +54,36 @@ export type ItemTypeConfig = {
 
 export const itemTypeRegistry: ItemTypeConfig[] = [
   {
+    type: ItemType.RISK_ITEM,
+    slug: "risks",
+    label: "Planning & Risk Document",
+    pluralLabel: "Planning & Risk Documents",
+    codePrefix: "RI",
+    icon: AlertTriangle,
+    titleField: "hazard",
+    fields: [
+      { key: "hazard", label: "Hazard", kind: "text", required: true },
+      {
+        key: "hazardousSituation",
+        label: "Hazardous situation",
+        kind: "textarea",
+        required: true,
+      },
+      { key: "harm", label: "Harm", kind: "text", required: true },
+      { key: "severityInitial", label: "Severity (initial)", kind: "number", required: true },
+      {
+        key: "probabilityInitial",
+        label: "Probability (initial)",
+        kind: "number",
+        required: true,
+      },
+      { key: "rpnInitial", label: "RPN (initial)", kind: "number", required: true },
+      { key: "severityResidual", label: "Severity (residual)", kind: "number" },
+      { key: "probabilityResidual", label: "Probability (residual)", kind: "number" },
+      { key: "rpnResidual", label: "RPN (residual)", kind: "number" },
+    ],
+  },
+  {
     type: ItemType.USER_NEED,
     slug: "user-needs",
     label: "User Need",
@@ -98,36 +128,6 @@ export const itemTypeRegistry: ItemTypeConfig[] = [
     fields: [
       { key: "specText", label: "Specification", kind: "textarea", required: true },
       { key: "implementationRef", label: "Implementation reference", kind: "text" },
-    ],
-  },
-  {
-    type: ItemType.RISK_ITEM,
-    slug: "risks",
-    label: "Risk",
-    pluralLabel: "Risks",
-    codePrefix: "RI",
-    icon: AlertTriangle,
-    titleField: "hazard",
-    fields: [
-      { key: "hazard", label: "Hazard", kind: "text", required: true },
-      {
-        key: "hazardousSituation",
-        label: "Hazardous situation",
-        kind: "textarea",
-        required: true,
-      },
-      { key: "harm", label: "Harm", kind: "text", required: true },
-      { key: "severityInitial", label: "Severity (initial)", kind: "number", required: true },
-      {
-        key: "probabilityInitial",
-        label: "Probability (initial)",
-        kind: "number",
-        required: true,
-      },
-      { key: "rpnInitial", label: "RPN (initial)", kind: "number", required: true },
-      { key: "severityResidual", label: "Severity (residual)", kind: "number" },
-      { key: "probabilityResidual", label: "Probability (residual)", kind: "number" },
-      { key: "rpnResidual", label: "RPN (residual)", kind: "number" },
     ],
   },
   {

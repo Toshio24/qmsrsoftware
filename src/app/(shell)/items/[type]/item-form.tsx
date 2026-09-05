@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
 import type { FieldConfig } from "@/lib/domain/itemTypes";
 
@@ -155,12 +156,14 @@ export function ItemForm({
   defaultValues,
   submitLabel,
   allowAttachments = false,
+  cancelHref,
 }: {
   fields: FieldConfig[];
   action: (prevState: ItemFormState, formData: FormData) => Promise<ItemFormState>;
   defaultValues?: Record<string, unknown>;
   submitLabel: string;
   allowAttachments?: boolean;
+  cancelHref?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
@@ -174,7 +177,7 @@ export function ItemForm({
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 
-      <div>
+      <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={pending}
@@ -182,6 +185,11 @@ export function ItemForm({
         >
           {pending ? "Saving…" : submitLabel}
         </button>
+        {cancelHref && (
+          <Link href={cancelHref} className="text-sm text-neutral-500 hover:underline">
+            Cancel
+          </Link>
+        )}
       </div>
     </form>
   );

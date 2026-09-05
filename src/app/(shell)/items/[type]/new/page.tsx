@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
 import { getFolder, getFolderPath } from "@/lib/server/repository/folders";
@@ -28,9 +29,17 @@ export default async function NewItemPage({
     if (folder && folder.itemType === config.type) folderId = folder.id;
   }
   const folderPath = folderId ? await getFolderPath(folderId) : [];
+  const backHref = folderId ? `/items/${config.slug}?folder=${folderId}` : `/items/${config.slug}`;
 
   return (
     <div className="flex flex-col gap-4">
+      <Link
+        href={backHref}
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 hover:underline dark:hover:text-neutral-300"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to {config.pluralLabel}
+      </Link>
       <div>
         <h1 className="text-2xl font-semibold">New {config.label}</h1>
         {folderPath.length > 0 && (
@@ -47,6 +56,7 @@ export default async function NewItemPage({
         action={createItemAction.bind(null, slug, folderId)}
         submitLabel="Create"
         allowAttachments
+        cancelHref={backHref}
       />
     </div>
   );

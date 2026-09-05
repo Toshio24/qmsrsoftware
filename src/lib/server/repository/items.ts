@@ -66,38 +66,45 @@ export function toPlainVersionData(version: VersionRow): Record<string, unknown>
   return rest;
 }
 
+const DESIGN_INPUT_CODE_PATTERN = /^DI-(\d+)\.(\d+)$/;
+
 /**
  * Design Input only: "DI-<categoryNumber>.<itemNumber>" instead of the flat
  * per-type counter — categoryNumber is assigned in order of first use of
  * that category name (uncategorized items share one "Uncategorized"
- * bucket), itemNumber counts up within it. See CategorySequence in schema.
+ * bucket). itemNumber is the smallest number not currently occupied in
+ * DesignInputCodeSlot for that category — retiring an item frees its slot
+ * (see updateItemStatus), so numbers get reused rather than climbing
+ * forever. Returns the code plus the slot to occupy once the item exists.
  */
-async function nextDesignInputCode(tx: TxClient, category: unknown): Promise<string> {
+async function nextDesignInputCode(
+  tx: TxClient,
+  category: unknown
+): Promise<{ humanCode: string; categoryNumber: number; itemNumber: number }> {
   const categoryName = (typeof category === "string" ? category.trim() : "") || "Uncategorized";
 
-  const existing = await tx.categorySequence.findUnique({
+  let categorySeq = await tx.categorySequence.findUnique({
     where: { itemType_categoryName: { itemType: ItemType.DESIGN_INPUT, categoryName } },
   });
-  if (existing) {
-    const updated = await tx.categorySequence.update({
-      where: { itemType_categoryName: { itemType: ItemType.DESIGN_INPUT, categoryName } },
-      data: { lastItemNumber: { increment: 1 } },
+  if (!categorySeq) {
+    const categoryCount = await tx.categorySequence.count({
+      where: { itemType: ItemType.DESIGN_INPUT },
     });
-    return `DI-${updated.categoryNumber}.${updated.lastItemNumber}`;
+    categorySeq = await tx.categorySequence.create({
+      data: { itemType: ItemType.DESIGN_INPUT, categoryName, categoryNumber: categoryCount + 1 },
+    });
   }
+  const { categoryNumber } = categorySeq;
 
-  const categoryCount = await tx.categorySequence.count({
-    where: { itemType: ItemType.DESIGN_INPUT },
+  const occupiedSlots = await tx.designInputCodeSlot.findMany({
+    where: { categoryNumber },
+    select: { itemNumber: true },
   });
-  const created = await tx.categorySequence.create({
-    data: {
-      itemType: ItemType.DESIGN_INPUT,
-      categoryName,
-      categoryNumber: categoryCount + 1,
-      lastItemNumber: 1,
-    },
-  });
-  return `DI-${created.categoryNumber}.${created.lastItemNumber}`;
+  const occupied = new Set(occupiedSlots.map((s) => s.itemNumber));
+  let itemNumber = 1;
+  while (occupied.has(itemNumber)) itemNumber++;
+
+  return { humanCode: `DI-${categoryNumber}.${itemNumber}`, categoryNumber, itemNumber };
 }
 
 export async function createItem(
@@ -111,21 +118,31 @@ export async function createItem(
   const title = deriveTitle(config, data);
 
   return db.$transaction(async (tx) => {
-    const humanCode =
-      type === ItemType.DESIGN_INPUT
-        ? await nextDesignInputCode(tx, data.category)
-        : await (async () => {
-            const seq = await tx.itemSequence.upsert({
-              where: { itemType: type },
-              create: { itemType: type, lastNumber: 1 },
-              update: { lastNumber: { increment: 1 } },
-            });
-            return `${config.codePrefix}-${String(seq.lastNumber).padStart(3, "0")}`;
-          })();
+    let humanCode: string;
+    let designInputSlot: { categoryNumber: number; itemNumber: number } | null = null;
+
+    if (type === ItemType.DESIGN_INPUT) {
+      const next = await nextDesignInputCode(tx, data.category);
+      humanCode = next.humanCode;
+      designInputSlot = { categoryNumber: next.categoryNumber, itemNumber: next.itemNumber };
+    } else {
+      const seq = await tx.itemSequence.upsert({
+        where: { itemType: type },
+        create: { itemType: type, lastNumber: 1 },
+        update: { lastNumber: { increment: 1 } },
+      });
+      humanCode = `${config.codePrefix}-${String(seq.lastNumber).padStart(3, "0")}`;
+    }
 
     const traceItem = await tx.traceItem.create({
       data: { itemType: type, humanCode, title, createdById: actor.id, folderId },
     });
+
+    if (designInputSlot) {
+      await tx.designInputCodeSlot.create({
+        data: { ...designInputSlot, traceItemId: traceItem.id },
+      });
+    }
 
     await delegateFor(type, tx).create({
       data: { traceItemId: traceItem.id, versionNumber: 1, createdById: actor.id, ...data },
@@ -264,11 +281,14 @@ export async function getDistinctFieldValues(type: ItemType, fieldKey: string): 
     .filter((v): v is string => typeof v === "string" && v.trim() !== "");
 }
 
-/** Lightweight item list for populating link-target pickers. */
+/** Lightweight item list for populating link-target pickers. Retired items
+ * are excluded — linking to something no longer active isn't useful and
+ * would just add clutter to the dropdown. */
 export async function listItemSummaries(types: ItemType[], excludeId?: string) {
   return db.traceItem.findMany({
     where: {
       itemType: { in: types },
+      status: { not: ItemStatus.RETIRED },
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
     select: {
@@ -338,15 +358,35 @@ export async function getItemWithCurrentVersion(type: ItemType, traceItemId: str
 export async function updateItemStatus(traceItemId: string, status: ItemStatus, actor: Actor) {
   return db.$transaction(async (tx) => {
     const before = await tx.traceItem.findUniqueOrThrow({ where: { id: traceItemId } });
-    const updated = await tx.traceItem.update({ where: { id: traceItemId }, data: { status } });
+
+    // Design Input only: retiring frees its "<categoryNumber>.<itemNumber>"
+    // slot for reuse by a later item — the TraceItem itself is kept (never
+    // deleted), just its humanCode gets a "(retired)" suffix so the freed
+    // short code can't collide with this now-inactive record. Guarded by
+    // the pattern match so this only fires once, the first time an item in
+    // the category-code scheme is retired.
+    let humanCode = before.humanCode;
+    if (
+      status === ItemStatus.RETIRED &&
+      before.itemType === ItemType.DESIGN_INPUT &&
+      DESIGN_INPUT_CODE_PATTERN.test(before.humanCode)
+    ) {
+      humanCode = `${before.humanCode} (retired)`;
+      await tx.designInputCodeSlot.deleteMany({ where: { traceItemId } });
+    }
+
+    const updated = await tx.traceItem.update({
+      where: { id: traceItemId },
+      data: { status, humanCode },
+    });
 
     await writeAuditLog(tx, {
       entityType: before.itemType,
       entityId: traceItemId,
       action: AuditAction.STATUS_CHANGE,
       actor,
-      beforeState: { status: before.status },
-      afterState: { status },
+      beforeState: { status: before.status, humanCode: before.humanCode },
+      afterState: { status, humanCode },
     });
 
     return updated;

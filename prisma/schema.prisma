@@ -588,16 +588,30 @@ model ItemSequence {
 // instead of the flat per-type counter every other item type uses (see
 // createItem() in repository/items.ts) — categoryNumber is assigned the
 // first time a given category name is used for a Design Input, in order of
-// first use, and itemNumber counts up within that category.
+// first use.
 model CategorySequence {
   itemType       ItemType
   categoryName   String
   categoryNumber Int
-  lastItemNumber Int      @default(0)
 
   @@id([itemType, categoryName])
   @@unique([itemType, categoryNumber])
   @@map("category_sequences")
+}
+
+// Which "<categoryNumber>.<itemNumber>" slots are currently occupied, for
+// Design Input's category-based humanCode. Deliberately NOT append-only,
+// unlike TraceItem: when a Design Input is retired, its slot row is deleted
+// so a later item can reuse that short code — the TraceItem itself is never
+// deleted, only its humanCode gets a "(retired)" suffix at that point (see
+// updateItemStatus in repository/items.ts), so the audit trail stays intact.
+model DesignInputCodeSlot {
+  categoryNumber Int
+  itemNumber     Int
+  traceItemId    String @unique
+
+  @@id([categoryNumber, itemNumber])
+  @@map("design_input_code_slots")
 }
 
 // ---------- Test execution results (separate from the test definition) ----------

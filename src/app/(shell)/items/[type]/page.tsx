@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
+import { getItemTypeConfigBySlug, itemTypeByType } from "@/lib/domain/itemTypes";
+import { getLinkRulesForSourceType } from "@/lib/domain/linkRules";
+import { ItemType } from "@/generated/prisma/enums";
 import { countRetiredItems, listItemsWithCurrentVersion } from "@/lib/server/repository/items";
 import {
   getFolder,
@@ -8,6 +10,7 @@ import {
   getFolderPath,
   getFoldersFlatForType,
 } from "@/lib/server/repository/folders";
+import { getLinkedTargetsByType } from "@/lib/server/repository/links";
 import { requireUser } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 import { BoardView } from "./board-view";
@@ -58,6 +61,17 @@ export default async function ItemTypeListPage({
     ]);
     totalCount = rows.length + subfolders.length;
     retiredCount = retiredHiddenCount;
+
+    // Only show a "linked X" column when this item type actually has an
+    // outgoing relationship to User Needs (e.g. Design Input, Risk) — not
+    // meaningful for every item type.
+    const linksToUserNeeds = getLinkRulesForSourceType(config.type).some((r) =>
+      r.targetTypes.includes(ItemType.USER_NEED)
+    );
+    const linkedUserNeedsByItemId = linksToUserNeeds
+      ? await getLinkedTargetsByType(rows.map(({ item }) => item.id), ItemType.USER_NEED)
+      : new Map<string, { id: string; humanCode: string }[]>();
+
     listContent = (
       <FolderBrowser
         slug={config.slug}
@@ -73,6 +87,9 @@ export default async function ItemTypeListPage({
           status: item.status,
         }))}
         allFoldersFlat={allFoldersFlat}
+        linkedColumnLabel={linksToUserNeeds ? itemTypeByType.get(ItemType.USER_NEED)?.label : undefined}
+        linkedColumnSlug={itemTypeByType.get(ItemType.USER_NEED)?.slug}
+        linkedItemsByItemId={Object.fromEntries(linkedUserNeedsByItemId)}
       />
     );
   } else {

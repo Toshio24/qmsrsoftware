@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/server/db";
-import { AuditAction, LinkStatus, LinkType } from "@/generated/prisma/enums";
+import { AuditAction, ItemType, LinkStatus, LinkType } from "@/generated/prisma/enums";
 import { isValidLink } from "@/lib/domain/linkRules";
 import { writeAuditLog, type Actor } from "@/lib/server/audit";
 
@@ -102,4 +102,33 @@ export async function getAllActiveLinks() {
     where: { status: LinkStatus.ACTIVE },
     include: { sourceItem: true, targetItem: true },
   });
+}
+
+/**
+ * For a batch of source items, the ACTIVE-linked targets of one specific
+ * type (e.g. every linked User Need for a page of Design Inputs) — one
+ * query for the whole list, keyed by source item id.
+ */
+export async function getLinkedTargetsByType(
+  sourceItemIds: string[],
+  targetType: ItemType
+): Promise<Map<string, { id: string; humanCode: string }[]>> {
+  if (sourceItemIds.length === 0) return new Map();
+
+  const links = await db.traceLink.findMany({
+    where: {
+      sourceItemId: { in: sourceItemIds },
+      status: LinkStatus.ACTIVE,
+      targetItem: { itemType: targetType },
+    },
+    select: { sourceItemId: true, targetItem: { select: { id: true, humanCode: true } } },
+  });
+
+  const result = new Map<string, { id: string; humanCode: string }[]>();
+  for (const link of links) {
+    const bucket = result.get(link.sourceItemId);
+    if (bucket) bucket.push(link.targetItem);
+    else result.set(link.sourceItemId, [link.targetItem]);
+  }
+  return result;
 }

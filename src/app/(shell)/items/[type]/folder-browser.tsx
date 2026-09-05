@@ -167,6 +167,9 @@ export function FolderBrowser({
   subfolders,
   items,
   allFoldersFlat,
+  linkedColumnLabel,
+  linkedColumnSlug,
+  linkedItemsByItemId,
 }: {
   slug: string;
   itemLabel: string;
@@ -176,6 +179,11 @@ export function FolderBrowser({
   subfolders: FolderNode[];
   items: ItemNode[];
   allFoldersFlat: FlatFolder[];
+  /** e.g. "User Need" — omit to hide the linked-items column entirely. */
+  linkedColumnLabel?: string;
+  /** slug for the linked item type, to build links to it (e.g. "user-needs"). */
+  linkedColumnSlug?: string;
+  linkedItemsByItemId?: Record<string, { id: string; humanCode: string }[]>;
 }) {
   const router = useRouter();
   const [dragOverTarget, setDragOverTarget] = useState<string | "root" | null>(null);
@@ -312,6 +320,7 @@ export function FolderBrowser({
               <tr>
                 <th className="px-3 py-2">Code</th>
                 <th className="px-3 py-2">Title</th>
+                {linkedColumnLabel && <th className="px-3 py-2">{linkedColumnLabel}</th>}
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Folder</th>
               </tr>
@@ -335,6 +344,25 @@ export function FolderBrowser({
                       {item.title}
                     </Link>
                   </td>
+                  {linkedColumnLabel && (
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {(() => {
+                        const linked = linkedItemsByItemId?.[item.id] ?? [];
+                        if (linked.length === 0) return <span className="text-neutral-400">—</span>;
+                        return linked.map((target, i) => (
+                          <span key={target.id}>
+                            {i > 0 && ", "}
+                            <Link
+                              href={`/items/${linkedColumnSlug}/${target.id}`}
+                              className="hover:underline"
+                            >
+                              {target.humanCode}
+                            </Link>
+                          </span>
+                        ));
+                      })()}
+                    </td>
+                  )}
                   <td className="px-3 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${statusBadgeClasses(item.status)}`}>
                       {item.status}

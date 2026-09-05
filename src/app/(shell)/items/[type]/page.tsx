@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
-import { listItemsWithCurrentVersion } from "@/lib/server/repository/items";
+import { countRetiredItems, listItemsWithCurrentVersion } from "@/lib/server/repository/items";
 import {
   getFolder,
   getFolderChildren,
@@ -22,7 +22,7 @@ export default async function ItemTypeListPage({
   searchParams,
 }: {
   params: Promise<{ type: string }>;
-  searchParams: Promise<{ view?: string; folder?: string }>;
+  searchParams: Promise<{ view?: string; folder?: string; retired?: string }>;
 }) {
   await requireUser();
 
@@ -30,10 +30,11 @@ export default async function ItemTypeListPage({
   const config = getItemTypeConfigBySlug(slug);
   if (!config) notFound();
 
-  const { view: viewParam, folder: folderParam } = await searchParams;
+  const { view: viewParam, folder: folderParam, retired: retiredParam } = await searchParams;
   const view: ViewMode = (VIEW_MODES as readonly string[]).includes(viewParam ?? "")
     ? (viewParam as ViewMode)
     : "list";
+  const showRetired = retiredParam === "1";
 
   // A folder id from another item type (or a stale/bad one) is treated as
   // root rather than erroring — folders are scoped per item type.
@@ -45,15 +46,18 @@ export default async function ItemTypeListPage({
 
   let listContent: React.ReactNode;
   let totalCount: number;
+  let retiredCount: number;
 
   if (view === "list") {
-    const [subfolders, rows, folderPath, allFoldersFlat] = await Promise.all([
+    const [subfolders, rows, folderPath, allFoldersFlat, retiredHiddenCount] = await Promise.all([
       getFolderChildren(config.type, currentFolderId),
-      listItemsWithCurrentVersion(config.type, currentFolderId),
+      listItemsWithCurrentVersion(config.type, currentFolderId, { includeRetired: showRetired }),
       currentFolderId ? getFolderPath(currentFolderId) : Promise.resolve([]),
       getFoldersFlatForType(config.type),
+      countRetiredItems(config.type, currentFolderId),
     ]);
     totalCount = rows.length + subfolders.length;
+    retiredCount = retiredHiddenCount;
     listContent = (
       <FolderBrowser
         slug={config.slug}
@@ -72,10 +76,23 @@ export default async function ItemTypeListPage({
       />
     );
   } else {
-    const rows = await listItemsWithCurrentVersion(config.type);
+    const [rows, retiredHiddenCount] = await Promise.all([
+      listItemsWithCurrentVersion(config.type, undefined, { includeRetired: showRetired }),
+      countRetiredItems(config.type),
+    ]);
     totalCount = rows.length;
+    retiredCount = retiredHiddenCount;
     listContent = view === "board" ? <BoardView config={config} rows={rows} /> : <GridView config={config} rows={rows} />;
   }
+
+  const retiredToggleHref = (() => {
+    const p = new URLSearchParams();
+    if (viewParam) p.set("view", viewParam);
+    if (currentFolderId) p.set("folder", currentFolderId);
+    if (!showRetired) p.set("retired", "1");
+    const qs = p.toString();
+    return `/items/${config.slug}${qs ? `?${qs}` : ""}`;
+  })();
 
   return (
     <div className="flex flex-col gap-4">
@@ -84,6 +101,16 @@ export default async function ItemTypeListPage({
           <h1 className="text-2xl font-semibold">{config.pluralLabel}</h1>
           <p className="text-sm text-neutral-500">
             {totalCount} item{totalCount === 1 ? "" : "s"}
+            {retiredCount > 0 && (
+              <>
+                {" · "}
+                <Link href={retiredToggleHref} className="underline-offset-2 hover:underline">
+                  {showRetired
+                    ? "hide retired"
+                    : `${retiredCount} retired hidden — show`}
+                </Link>
+              </>
+            )}
           </p>
         </div>
         <Link
@@ -99,20 +126,25 @@ export default async function ItemTypeListPage({
       </div>
 
       <div className="flex gap-1 border-b border-neutral-200 dark:border-neutral-800">
-        {VIEW_MODES.map((mode) => (
-          <Link
-            key={mode}
-            href={`/items/${config.slug}?view=${mode}`}
-            className={cn(
-              "-mb-px border-b-2 px-3 py-1.5 text-sm capitalize",
-              view === mode
-                ? "border-neutral-900 font-medium dark:border-neutral-100"
-                : "border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
-            )}
-          >
-            {mode}
-          </Link>
-        ))}
+        {VIEW_MODES.map((mode) => {
+          const p = new URLSearchParams({ view: mode });
+          if (currentFolderId) p.set("folder", currentFolderId);
+          if (showRetired) p.set("retired", "1");
+          return (
+            <Link
+              key={mode}
+              href={`/items/${config.slug}?${p.toString()}`}
+              className={cn(
+                "-mb-px border-b-2 px-3 py-1.5 text-sm capitalize",
+                view === mode
+                  ? "border-neutral-900 font-medium dark:border-neutral-100"
+                  : "border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+              )}
+            >
+              {mode}
+            </Link>
+          );
+        })}
       </div>
 
       {listContent}

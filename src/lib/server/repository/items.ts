@@ -158,10 +158,22 @@ export async function createItemVersion(
  * `folderId`: omit to return every item of the type regardless of folder
  * (used by Board/Grid views, which ignore folders); pass `null` for only
  * unfiled/root items; pass a folder id for only that folder's direct items.
+ *
+ * RETIRED items are excluded by default — they're kept for the audit trail
+ * but shouldn't clutter the active lists; pass `includeRetired: true` to
+ * show them (e.g. an explicit "show retired" toggle).
  */
-export async function listItemsWithCurrentVersion(type: ItemType, folderId?: string | null) {
+export async function listItemsWithCurrentVersion(
+  type: ItemType,
+  folderId?: string | null,
+  { includeRetired = false }: { includeRetired?: boolean } = {}
+) {
   const items = await db.traceItem.findMany({
-    where: { itemType: type, ...(folderId !== undefined ? { folderId } : {}) },
+    where: {
+      itemType: type,
+      ...(folderId !== undefined ? { folderId } : {}),
+      ...(includeRetired ? {} : { status: { not: ItemStatus.RETIRED } }),
+    },
     orderBy: { createdAt: "desc" },
     include: { createdBy: true },
   });
@@ -183,6 +195,17 @@ export async function listItemsWithCurrentVersion(type: ItemType, folderId?: str
     item,
     version: versionByItemId.get(item.id) ?? null,
   }));
+}
+
+/** Count of RETIRED items hidden by the default view, for a "show retired" toggle. */
+export async function countRetiredItems(type: ItemType, folderId?: string | null) {
+  return db.traceItem.count({
+    where: {
+      itemType: type,
+      status: ItemStatus.RETIRED,
+      ...(folderId !== undefined ? { folderId } : {}),
+    },
+  });
 }
 
 /** Lightweight item list for populating link-target pickers. */

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ItemStatus } from "@/generated/prisma/enums";
-import type { ItemTypeConfig } from "@/lib/domain/itemTypes";
+import { deriveRowTitle, type ItemTypeConfig } from "@/lib/domain/itemTypes";
 import type { ItemRow } from "./types";
 import { EmptyState } from "./list-view";
 
@@ -39,9 +39,7 @@ export function BoardView({ config, rows }: { config: ItemTypeConfig; rows: Item
                     <Icon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
                     <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap">
-                    {(version?.[config.titleField] as string | undefined) || item.title}
-                  </p>
+                  <p className="mt-1 whitespace-pre-wrap">{deriveRowTitle(config, item, version)}</p>
                 </Link>
               ))}
             </div>

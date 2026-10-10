@@ -1,4 +1,5 @@
 import type { FieldConfig } from "./itemTypes";
+import { stripHtmlToText } from "./richText";
 
 export function formatFieldValue(field: FieldConfig, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -15,6 +16,13 @@ export function formatFieldValue(field: FieldConfig, value: unknown): string {
     case "date": {
       const d = value instanceof Date ? value : new Date(value as string);
       return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+    }
+    case "textarea": {
+      // These store rich HTML now (see richText.ts) — this helper is used
+      // in compact plain-text contexts (link-picker/history previews), not
+      // the item's own detail page, which renders the rich content directly.
+      const text = stripHtmlToText(value);
+      return text || "—";
     }
     default:
       return String(value);

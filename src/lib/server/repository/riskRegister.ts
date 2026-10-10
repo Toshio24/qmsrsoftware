@@ -3,6 +3,7 @@ import { db } from "@/lib/server/db";
 import { ItemType, LinkStatus, LinkType } from "@/generated/prisma/enums";
 import { listItemsWithCurrentVersion } from "./items";
 import { classifyRisk, type RiskAcceptability } from "@/lib/domain/riskMatrix";
+import { stripHtmlToText } from "@/lib/domain/richText";
 
 export type RiskRegisterRow = {
   id: string;
@@ -64,7 +65,9 @@ export async function getRiskRegisterRows(productId?: string): Promise<RiskRegis
       title: item.title,
       status: item.status,
       hazard: (version?.hazard as string | undefined) ?? "",
-      hazardousSituation: (version?.hazardousSituation as string | undefined) ?? "",
+      // hazardousSituation is a "textarea" field — stores rich HTML now
+      // (see richText.ts); this export is plain PDF/CSV text, not HTML.
+      hazardousSituation: stripHtmlToText(version?.hazardousSituation),
       harm: (version?.harm as string | undefined) ?? "",
       severityInitial,
       probabilityInitial,

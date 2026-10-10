@@ -26,3 +26,48 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Rich text content — shared by the editor (components/rich-text-editor.tsx)
+   and the read-only rendering of the same HTML on an item's detail page, so
+   what you see while editing matches what's displayed after saving. */
+.rich-content {
+  line-height: 1.5;
+}
+.rich-content p {
+  margin: 0 0 0.5em;
+}
+.rich-content p:last-child {
+  margin-bottom: 0;
+}
+.rich-content ul,
+.rich-content ol {
+  margin: 0 0 0.5em;
+  padding-left: 1.5em;
+}
+.rich-content li {
+  margin: 0.15em 0;
+}
+.rich-content table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  table-layout: fixed;
+  width: 100%;
+}
+.rich-content td,
+.rich-content th {
+  border: 1px solid var(--color-neutral-300, #d4d4d4);
+  padding: 0.35em 0.5em;
+  vertical-align: top;
+}
+.dark .rich-content td,
+.dark .rich-content th {
+  border-color: var(--color-neutral-700, #404040);
+}
+.rich-content th {
+  background: var(--color-neutral-100, #f5f5f5);
+  font-weight: 600;
+  text-align: left;
+}
+.dark .rich-content th {
+  background: var(--color-neutral-800, #262626);
+}

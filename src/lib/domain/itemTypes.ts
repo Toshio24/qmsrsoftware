@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { ItemType } from "@/generated/prisma/enums";
 import { PROBABILITY_LEVELS, SEVERITY_LEVELS, computeRpn } from "./riskMatrix";
+import { stripHtmlToText } from "./richText";
 
 export type FieldKind =
   | "text"
@@ -586,6 +587,27 @@ export function getEntityLabel(entityType: string): string {
 
 export function deriveTitle(config: ItemTypeConfig, data: Record<string, unknown>): string {
   const raw = data[config.titleField];
-  const text = typeof raw === "string" ? raw : String(raw ?? "");
+  const rawText = typeof raw === "string" ? raw : String(raw ?? "");
+  // titleField is sometimes a "textarea" field, which now stores rich HTML
+  // (see richText.ts) — strip it down to plain text here since this title
+  // is what shows up everywhere: list rows, the trace matrix, nav, exports.
+  const text = stripHtmlToText(rawText).replace(/\s+/g, " ").trim();
   return text || config.label;
+}
+
+/** List/board/grid rows read the *current* version's titleField directly
+ * (rather than always trusting TraceItem.title) so a just-saved edit shows
+ * immediately without waiting on anything — same HTML-stripping as
+ * deriveTitle, since that field can be rich HTML. Falls back to the item's
+ * already-derived title when the version doesn't have the field (e.g. it's
+ * missing/blank). */
+export function deriveRowTitle(
+  config: ItemTypeConfig,
+  item: { title: string },
+  version: Record<string, unknown> | null | undefined
+): string {
+  const fromVersion = stripHtmlToText(version?.[config.titleField])
+    .replace(/\s+/g, " ")
+    .trim();
+  return fromVersion || item.title;
 }

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
 import type { FieldConfig } from "@/lib/domain/itemTypes";
+import { toEditableHtml } from "@/lib/domain/richText";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 export type ItemFormState = { error?: string };
 
@@ -94,14 +96,14 @@ function FieldInput({
     return (
       <div>
         {label}
-        <textarea
-          id={field.key}
-          name={field.key}
-          required={field.required}
-          defaultValue={(defaultValue as string) ?? ""}
-          rows={4}
-          className={inputClass}
-        />
+        <div className="mt-1">
+          <RichTextEditor
+            id={field.key}
+            name={field.key}
+            defaultValue={toEditableHtml(defaultValue)}
+            required={field.required}
+          />
+        </div>
         {field.helpText && <p className="mt-1 text-xs text-neutral-500">{field.helpText}</p>}
       </div>
     );

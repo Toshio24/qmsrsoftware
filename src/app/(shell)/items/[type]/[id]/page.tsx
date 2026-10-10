@@ -6,6 +6,7 @@ import { getItemWithCurrentVersion } from "@/lib/server/repository/items";
 import { getProduct } from "@/lib/server/repository/products";
 import { requireUser } from "@/lib/auth/session";
 import { formatFieldValue, statusBadgeClasses } from "@/lib/domain/formatField";
+import { toEditableHtml } from "@/lib/domain/richText";
 import { ItemType } from "@/generated/prisma/enums";
 import { StatusSelectForm } from "./status-select-form";
 import { LinksSection } from "./links-section";
@@ -106,7 +107,7 @@ export default async function ItemDetailPage({
               <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                 {field.label}
               </dt>
-              <dd className="mt-0.5 whitespace-pre-wrap text-sm">
+              <dd className="mt-0.5 text-sm">
                 {field.kind === "url" && typeof rawValue === "string" && rawValue ? (
                   <a
                     href={rawValue}
@@ -117,8 +118,22 @@ export default async function ItemDetailPage({
                     {rawValue}
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                   </a>
+                ) : field.kind === "textarea" ? (
+                  rawValue ? (
+                    // Rich content (tables, lists, etc.) — see richText.ts.
+                    // The HTML here only ever came from RichTextEditor's own
+                    // schema-constrained output or the legacy-plain-text
+                    // escaping path, never from arbitrary user-supplied raw
+                    // markup, so this is safe to render as-is.
+                    <div
+                      className="rich-content"
+                      dangerouslySetInnerHTML={{ __html: toEditableHtml(rawValue) }}
+                    />
+                  ) : (
+                    "—"
+                  )
                 ) : (
-                  formatFieldValue(field, rawValue)
+                  <span className="whitespace-pre-wrap">{formatFieldValue(field, rawValue)}</span>
                 )}
               </dd>
             </div>

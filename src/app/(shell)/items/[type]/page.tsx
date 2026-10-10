@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getItemTypeConfigBySlug, itemTypeByType } from "@/lib/domain/itemTypes";
+import { deriveRowTitle, getItemTypeConfigBySlug, itemTypeByType } from "@/lib/domain/itemTypes";
 import { getLinkRulesForSourceType } from "@/lib/domain/linkRules";
 import { ItemType } from "@/generated/prisma/enums";
 import { countRetiredItems, listItemsWithCurrentVersion } from "@/lib/server/repository/items";
@@ -103,7 +103,7 @@ export default async function ItemTypeListPage({
     let listItems = rows.map(({ item, version }) => ({
       id: item.id,
       humanCode: item.humanCode,
-      title: (version?.[config.titleField] as string | undefined) || item.title,
+      title: deriveRowTitle(config, item, version),
       status: item.status,
       acceptability: showAcceptabilityColumn
         ? classifyRisk(

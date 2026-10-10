@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ItemTypeConfig } from "@/lib/domain/itemTypes";
+import { deriveRowTitle, type ItemTypeConfig } from "@/lib/domain/itemTypes";
 import { statusBadgeClasses } from "@/lib/domain/formatField";
 import type { ItemRow } from "./types";
 import { EmptyState } from "./list-view";
@@ -25,9 +25,7 @@ export function GridView({ config, rows }: { config: ItemTypeConfig; rows: ItemR
             </span>
           </div>
           <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
-          <p className="whitespace-pre-wrap text-sm">
-            {(version?.[config.titleField] as string | undefined) || item.title}
-          </p>
+          <p className="whitespace-pre-wrap text-sm">{deriveRowTitle(config, item, version)}</p>
         </Link>
       ))}
     </div>

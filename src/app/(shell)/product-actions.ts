@@ -5,9 +5,8 @@ import { requireUser } from "@/lib/auth/session";
 import { setCurrentProductId } from "@/lib/auth/currentProduct";
 import { getProduct } from "@/lib/server/repository/products";
 
-export async function switchProductAction(formData: FormData) {
+export async function switchProductAction(productId: string) {
   await requireUser();
-  const productId = formData.get("productId") as string;
 
   const product = await getProduct(productId);
   if (!product) return;

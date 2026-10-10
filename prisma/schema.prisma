@@ -124,6 +124,8 @@ enum AuditAction {
   LINK_REMOVE
   ATTACHMENT_ADD
   ATTACHMENT_REMOVE
+  CUSTOM_FIELD_ADD
+  CUSTOM_FIELD_REMOVE
   SIGNATURE
   LOGIN
   LOGIN_FAILED
@@ -151,15 +153,17 @@ model User {
 
   sessions Session[]
 
-  createdItems       TraceItem[]  @relation("ItemCreatedBy")
-  signatures         ESignature[]
-  linksCreated       TraceLink[]  @relation("LinkCreatedBy")
-  linksRemoved       TraceLink[]  @relation("LinkRemovedBy")
-  attachmentsAdded   Attachment[] @relation("AttachmentAddedBy")
-  attachmentsRemoved Attachment[] @relation("AttachmentRemovedBy")
-  foldersCreated     Folder[]
-  testsExecuted      TestResult[] @relation("TestExecutedBy")
-  testsReviewed      TestResult[] @relation("TestReviewedBy")
+  createdItems        TraceItem[]   @relation("ItemCreatedBy")
+  signatures          ESignature[]
+  linksCreated        TraceLink[]   @relation("LinkCreatedBy")
+  linksRemoved        TraceLink[]   @relation("LinkRemovedBy")
+  attachmentsAdded    Attachment[]  @relation("AttachmentAddedBy")
+  attachmentsRemoved  Attachment[]  @relation("AttachmentRemovedBy")
+  customFieldsAdded   CustomField[] @relation("CustomFieldAddedBy")
+  customFieldsRemoved CustomField[] @relation("CustomFieldRemovedBy")
+  foldersCreated      Folder[]
+  testsExecuted       TestResult[]  @relation("TestExecutedBy")
+  testsReviewed       TestResult[]  @relation("TestReviewedBy")
 
   designPlanVersions         DesignPlanVersion[]
   userNeedVersions           UserNeedVersion[]
@@ -260,7 +264,8 @@ model TraceItem {
   linksAsSource TraceLink[] @relation("LinkSource")
   linksAsTarget TraceLink[] @relation("LinkTarget")
 
-  attachments Attachment[]
+  attachments  Attachment[]
+  customFields CustomField[]
 
   @@index([itemType])
   @@index([status])
@@ -736,6 +741,31 @@ model Attachment {
 
   @@index([traceItemId])
   @@map("attachments")
+}
+
+// ---------- Custom fields (any TraceItem -> an ad-hoc label/value pair) ----------
+// For whatever a record's fixed fields don't cover — e.g. a one-off "Date"
+// or "Reference #" someone needs on this particular item. Not part of the
+// type's versioned schema (see lib/domain/itemTypes.ts): addable any time,
+// same soft-delete pattern as Attachment, not Attachment itself (so they
+// don't get misread as reference links).
+
+model CustomField {
+  id          String     @id @default(uuid())
+  traceItemId String
+  traceItem   TraceItem  @relation(fields: [traceItemId], references: [id])
+  label       String
+  value       String
+  status      LinkStatus @default(ACTIVE)
+  addedById   String
+  addedBy     User       @relation("CustomFieldAddedBy", fields: [addedById], references: [id])
+  addedAt     DateTime   @default(now())
+  removedById String?
+  removedBy   User?      @relation("CustomFieldRemovedBy", fields: [removedById], references: [id])
+  removedAt   DateTime?
+
+  @@index([traceItemId])
+  @@map("custom_fields")
 }
 
 // ---------- Audit trail (append-only) ----------

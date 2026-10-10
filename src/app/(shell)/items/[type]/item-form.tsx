@@ -186,12 +186,64 @@ function AttachmentFields() {
   );
 }
 
+/** Repeatable label+value rows for ad-hoc fields not covered by this type's
+ * fixed schema (e.g. a one-off "Date"), submitted as same-named fields
+ * (customFieldLabel[]/customFieldValue[]) so the server can zip them by
+ * position — same pattern as AttachmentFields above. */
+function CustomFieldFields() {
+  const [rowIds, setRowIds] = useState<number[]>([]);
+  const nextId = useRef(0);
+
+  return (
+    <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
+      <p className="text-sm font-medium">Additional fields (optional)</p>
+      <p className="mt-1 text-xs text-neutral-500">
+        Anything this form doesn&rsquo;t already ask for — a label and a value. You can also add
+        these later from the item&rsquo;s page.
+      </p>
+
+      {rowIds.length > 0 && (
+        <div className="mt-3 flex flex-col gap-2">
+          {rowIds.map((id) => (
+            <div key={id} className="flex gap-2">
+              <input name="customFieldLabel" placeholder="Label, e.g. Date" className={inputClass} />
+              <textarea
+                name="customFieldValue"
+                placeholder="Value"
+                rows={1}
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={() => setRowIds((rows) => rows.filter((r) => r !== id))}
+                className="shrink-0 self-start text-xs text-neutral-500 underline-offset-2 hover:underline"
+                aria-label="Remove field row"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setRowIds((rows) => [...rows, nextId.current++])}
+        className="mt-3 text-sm underline-offset-2 hover:underline"
+      >
+        + Add field
+      </button>
+    </div>
+  );
+}
+
 export function ItemForm({
   fields,
   action,
   defaultValues,
   submitLabel,
   allowAttachments = false,
+  allowCustomFields = false,
   cancelHref,
   linkPicker,
   fieldSuggestions,
@@ -201,6 +253,7 @@ export function ItemForm({
   defaultValues?: Record<string, unknown>;
   submitLabel: string;
   allowAttachments?: boolean;
+  allowCustomFields?: boolean;
   cancelHref?: string;
   linkPicker?: React.ReactNode;
   fieldSuggestions?: Record<string, string[]>;
@@ -218,6 +271,7 @@ export function ItemForm({
         />
       ))}
 
+      {allowCustomFields && <CustomFieldFields />}
       {allowAttachments && <AttachmentFields />}
       {linkPicker}
 

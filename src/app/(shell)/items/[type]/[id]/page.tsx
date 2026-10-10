@@ -11,6 +11,7 @@ import { StatusSelectForm } from "./status-select-form";
 import { LinksSection } from "./links-section";
 import { SignaturesSection } from "./signatures-section";
 import { AttachmentsSection } from "./attachments-section";
+import { CustomFieldsSection } from "./custom-fields-section";
 import { RISK_SCORE_FIELD_KEYS, RiskAssessmentPanel } from "./risk-assessment-panel";
 
 export default async function ItemDetailPage({
@@ -124,6 +125,10 @@ export default async function ItemDetailPage({
           );
         })}
       </dl>
+
+      <div className="border-t border-neutral-200 pt-6 dark:border-neutral-800">
+        <CustomFieldsSection slug={slug} traceItemId={item.id} />
+      </div>
 
       <div className="border-t border-neutral-200 pt-6 dark:border-neutral-800">
         <AttachmentsSection slug={slug} traceItemId={item.id} />

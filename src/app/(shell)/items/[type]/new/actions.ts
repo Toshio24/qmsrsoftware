@@ -18,6 +18,14 @@ function extractAttachments(formData: FormData) {
     .filter((a) => a.name && a.url);
 }
 
+function extractCustomFields(formData: FormData) {
+  const labels = formData.getAll("customFieldLabel") as string[];
+  const values = formData.getAll("customFieldValue") as string[];
+  return labels
+    .map((label, i) => ({ label: label.trim(), value: (values[i] ?? "").trim() }))
+    .filter((f) => f.label && f.value);
+}
+
 export async function createItemAction(
   slug: string,
   folderId: string | null,
@@ -44,7 +52,16 @@ export async function createItemAction(
   if (!parsed.success) return { error: parsed.error };
 
   const attachments = extractAttachments(formData);
-  const item = await createItem(config.type, parsed.data, user, attachments, targetFolderId, productId);
+  const customFields = extractCustomFields(formData);
+  const item = await createItem(
+    config.type,
+    parsed.data,
+    user,
+    attachments,
+    targetFolderId,
+    productId,
+    customFields
+  );
 
   const linkType = formData.get("linkType") as LinkType | null;
   const targetItemId = formData.get("targetItemId") as string | null;

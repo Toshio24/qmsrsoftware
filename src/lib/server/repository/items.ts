@@ -4,6 +4,7 @@ import { ItemType, ItemStatus, AuditAction } from "@/generated/prisma/enums";
 import { getItemTypeConfig, deriveTitle } from "@/lib/domain/itemTypes";
 import { writeAuditLog, type Actor } from "@/lib/server/audit";
 import { createAttachmentInTx } from "./attachments";
+import { createCustomFieldInTx } from "./customFields";
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 type DbOrTx = typeof db | TxClient;
@@ -114,7 +115,8 @@ export async function createItem(
   actor: Actor,
   attachments: { name: string; url: string }[] = [],
   folderId: string | null = null,
-  productId: string | null = null
+  productId: string | null = null,
+  customFields: { label: string; value: string }[] = []
 ) {
   const config = getItemTypeConfig(type);
   const title = deriveTitle(config, data);
@@ -160,6 +162,10 @@ export async function createItem(
 
     for (const attachment of attachments) {
       await createAttachmentInTx(tx, traceItem.id, attachment.name, attachment.url, actor);
+    }
+
+    for (const field of customFields) {
+      await createCustomFieldInTx(tx, traceItem.id, field.label, field.value, actor);
     }
 
     return traceItem;

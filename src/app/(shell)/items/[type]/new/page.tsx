@@ -118,6 +118,7 @@ export default async function NewItemPage({
         action={createItemAction.bind(null, slug, folderId, itemProductId)}
         submitLabel="Create"
         allowAttachments
+        allowCustomFields
         cancelHref={backHref}
         fieldSuggestions={fieldSuggestions}
         linkPicker={

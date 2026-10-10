@@ -10,6 +10,8 @@ import {
   listItemSummaries,
 } from "@/lib/server/repository/items";
 import { requireUser } from "@/lib/auth/session";
+import { getCurrentProduct } from "@/lib/auth/currentProduct";
+import { isProductScopedType } from "@/lib/domain/itemTypes";
 import { ItemForm } from "../item-form";
 import { LinkPickerFields } from "../link-picker-fields";
 import { createItemAction } from "./actions";
@@ -28,19 +30,35 @@ export default async function NewItemPage({
 
   const { folder: folderParam } = await searchParams;
 
-  // A folder id from another item type (or a stale/bad one) is treated as
-  // unfiled rather than erroring — folders are scoped per item type.
+  const product = await getCurrentProduct();
+  const currentProductId = product?.id;
+  // The product this new item itself will belong to — null for unscoped
+  // (Quality Operations) types, which are never tied to a product.
+  const itemProductId = isProductScopedType(config.type) ? (currentProductId ?? null) : null;
+
+  // A folder id from another item type/product (or a stale/bad one) is
+  // treated as unfiled rather than erroring — folders are scoped per item
+  // type and, for product-scoped types, per product too.
   let folderId: string | null = null;
   if (folderParam) {
     const folder = await getFolder(folderParam);
-    if (folder && folder.itemType === config.type) folderId = folder.id;
+    if (folder && folder.itemType === config.type && folder.productId === itemProductId) {
+      folderId = folder.id;
+    }
   }
   const folderPath = folderId ? await getFolderPath(folderId) : [];
   const backHref = folderId ? `/items/${config.slug}?folder=${folderId}` : `/items/${config.slug}`;
 
   const sourceRules = getLinkRulesForSourceType(config.type);
   const targetTypesNeeded = Array.from(new Set(sourceRules.flatMap((r) => r.targetTypes)));
-  const candidates = targetTypesNeeded.length > 0 ? await listItemSummaries(targetTypesNeeded) : [];
+  // Link candidates are restricted to the current product (plus every
+  // unscoped/shared record) regardless of whether the new item itself is
+  // product-scoped — e.g. a new CAPA should only offer the current
+  // product's Risk Analyses to address, not another product's.
+  const candidates =
+    targetTypesNeeded.length > 0
+      ? await listItemSummaries(targetTypesNeeded, undefined, currentProductId)
+      : [];
 
   const candidateItemsByType: Record<
     string,
@@ -78,7 +96,14 @@ export default async function NewItemPage({
         Back to {config.pluralLabel}
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold">New {config.label}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold">New {config.label}</h1>
+          {itemProductId && product && (
+            <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-neutral-100 dark:text-neutral-900">
+              {product.name}
+            </span>
+          )}
+        </div>
         {folderPath.length > 0 && (
           <p className="mt-1 text-sm text-neutral-500">
             Will be created in{" "}
@@ -90,7 +115,7 @@ export default async function NewItemPage({
       </div>
       <ItemForm
         fields={config.fields}
-        action={createItemAction.bind(null, slug, folderId)}
+        action={createItemAction.bind(null, slug, folderId, itemProductId)}
         submitLabel="Create"
         allowAttachments
         cancelHref={backHref}

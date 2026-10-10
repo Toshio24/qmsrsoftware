@@ -24,6 +24,23 @@ function FieldInput({
   defaultValue?: unknown;
   suggestions?: string[];
 }) {
+  if (field.computed) {
+    // Derived from other fields on save (see FieldConfig.computed) — never
+    // editable, so there's nothing to submit here, just a preview of the
+    // last-saved value (blank until the item is first saved).
+    return (
+      <div>
+        <label className="text-sm font-medium">{field.label}</label>
+        <p className="mt-1 w-full rounded-md border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900">
+          {defaultValue === null || defaultValue === undefined || defaultValue === ""
+            ? "Computed on save"
+            : String(defaultValue)}
+        </p>
+        {field.helpText && <p className="mt-1 text-xs text-neutral-500">{field.helpText}</p>}
+      </div>
+    );
+  }
+
   if (field.kind === "boolean") {
     return (
       <div className="flex items-center gap-2">
@@ -48,7 +65,7 @@ function FieldInput({
     </label>
   );
 
-  if (field.kind === "select") {
+  if (field.kind === "select" || (field.kind === "number" && field.options)) {
     return (
       <div>
         {label}
@@ -56,7 +73,7 @@ function FieldInput({
           id={field.key}
           name={field.key}
           required={field.required}
-          defaultValue={(defaultValue as string) ?? ""}
+          defaultValue={defaultValue === null || defaultValue === undefined ? "" : String(defaultValue)}
           className={`${inputClass} bg-white`}
         >
           <option value="" disabled>
@@ -68,6 +85,7 @@ function FieldInput({
             </option>
           ))}
         </select>
+        {field.helpText && <p className="mt-1 text-xs text-neutral-500">{field.helpText}</p>}
       </div>
     );
   }

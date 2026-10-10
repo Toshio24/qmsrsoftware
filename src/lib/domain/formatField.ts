@@ -2,16 +2,19 @@ import type { FieldConfig } from "./itemTypes";
 
 export function formatFieldValue(field: FieldConfig, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
+  // Options can back either a "select" (string-valued) or "number"-valued
+  // field (e.g. a fixed 1-5 scale) — resolve the label the same way either
+  // way, before falling through to kind-specific formatting.
+  if (field.options) {
+    const opt = field.options.find((o) => o.value === String(value));
+    if (opt) return opt.label;
+  }
   switch (field.kind) {
     case "boolean":
       return value ? "Yes" : "No";
     case "date": {
       const d = value instanceof Date ? value : new Date(value as string);
       return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
-    }
-    case "select": {
-      const opt = field.options?.find((o) => o.value === value);
-      return opt?.label ?? String(value);
     }
     default:
       return String(value);

@@ -9,28 +9,34 @@ export async function createFolder(
   itemType: ItemType,
   name: string,
   parentFolderId: string | null,
-  actor: Actor
+  actor: Actor,
+  productId: string | null = null
 ): Promise<FolderResult> {
   const trimmedName = name.trim();
   if (!trimmedName) return { success: false, error: "Folder name is required." };
 
   if (parentFolderId) {
     const parent = await db.folder.findUnique({ where: { id: parentFolderId } });
-    if (!parent || parent.itemType !== itemType || parent.status !== LinkStatus.ACTIVE) {
+    if (
+      !parent ||
+      parent.itemType !== itemType ||
+      parent.status !== LinkStatus.ACTIVE ||
+      parent.productId !== productId
+    ) {
       return { success: false, error: "Parent folder not found." };
     }
   }
 
   const folder = await db.$transaction(async (tx) => {
     const created = await tx.folder.create({
-      data: { itemType, name: trimmedName, parentFolderId, createdById: actor.id },
+      data: { itemType, name: trimmedName, parentFolderId, createdById: actor.id, productId },
     });
     await writeAuditLog(tx, {
       entityType: "Folder",
       entityId: created.id,
       action: AuditAction.CREATE,
       actor,
-      afterState: { itemType, name: trimmedName, parentFolderId },
+      afterState: { itemType, name: trimmedName, parentFolderId, productId },
     });
     return created;
   });
@@ -112,6 +118,9 @@ export async function moveItemToFolder(
     if (folder.itemType !== item.itemType) {
       return { success: false, error: "That folder belongs to a different item type." };
     }
+    if (folder.productId !== item.productId) {
+      return { success: false, error: "That folder belongs to a different product." };
+    }
   }
 
   await db.$transaction(async (tx) => {
@@ -130,10 +139,20 @@ export async function moveItemToFolder(
   return { success: true };
 }
 
-/** Direct subfolders of `parentFolderId` (null = root) for one item type. */
-export async function getFolderChildren(itemType: ItemType, parentFolderId: string | null) {
+/** Direct subfolders of `parentFolderId` (null = root) for one item type,
+ * optionally restricted to one product's folder tree. */
+export async function getFolderChildren(
+  itemType: ItemType,
+  parentFolderId: string | null,
+  productId?: string | null
+) {
   return db.folder.findMany({
-    where: { itemType, parentFolderId, status: LinkStatus.ACTIVE },
+    where: {
+      itemType,
+      parentFolderId,
+      status: LinkStatus.ACTIVE,
+      ...(productId !== undefined ? { productId } : {}),
+    },
     orderBy: { name: "asc" },
   });
 }
@@ -160,10 +179,11 @@ export async function getFolderPath(folderId: string) {
 }
 
 /** Every active folder for a type, flattened into tree order with a depth
- * per node — for a "move to folder" picker that shows the whole tree. */
-export async function getFoldersFlatForType(itemType: ItemType) {
+ * per node — for a "move to folder" picker that shows the whole tree.
+ * `productId` restricts this to one product's folder tree. */
+export async function getFoldersFlatForType(itemType: ItemType, productId?: string | null) {
   const all = await db.folder.findMany({
-    where: { itemType, status: LinkStatus.ACTIVE },
+    where: { itemType, status: LinkStatus.ACTIVE, ...(productId !== undefined ? { productId } : {}) },
     orderBy: { name: "asc" },
   });
 

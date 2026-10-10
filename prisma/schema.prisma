@@ -21,6 +21,7 @@ enum UserRole {
 }
 
 enum ItemType {
+  DESIGN_PLAN
   USER_NEED
   DESIGN_INPUT
   DESIGN_OUTPUT
@@ -63,6 +64,7 @@ enum LinkType {
   SUPPLIED_BY
   TRAINED_ON
   USED_EQUIPMENT
+  GOVERNS
 }
 
 enum LinkStatus {
@@ -159,6 +161,7 @@ model User {
   testsExecuted      TestResult[] @relation("TestExecutedBy")
   testsReviewed      TestResult[] @relation("TestReviewedBy")
 
+  designPlanVersions         DesignPlanVersion[]
   userNeedVersions           UserNeedVersion[]
   designInputVersions        DesignInputVersion[]
   designOutputVersions       DesignOutputVersion[]
@@ -193,6 +196,24 @@ model Session {
   @@map("sessions")
 }
 
+// ---------- Products (devices) ----------
+// A product scopes the "Design Control" + "Risk Management" item types (see
+// PRODUCT_SCOPED_TYPES in lib/domain/itemTypes.ts) so e.g. LapRotator's and
+// ENT's Design Inputs are kept completely separate. The remaining "Quality
+// Operations" types (Suppliers, CAPAs, Training Records, ...) are
+// organizational, not per-device, and are never scoped to a product —
+// TraceItem.productId/Folder.productId stay null for those.
+
+model Product {
+  id         String      @id @default(uuid())
+  name       String      @unique
+  createdAt  DateTime    @default(now())
+  traceItems TraceItem[]
+  folders    Folder[]
+
+  @@map("products")
+}
+
 // ---------- Trace item identity (class-table-inheritance root) ----------
 
 model TraceItem {
@@ -211,6 +232,11 @@ model TraceItem {
   folderId String?
   folder   Folder? @relation(fields: [folderId], references: [id])
 
+  // Null for item types outside PRODUCT_SCOPED_TYPES (see header comment above).
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  designPlanVersions         DesignPlanVersion[]
   userNeedVersions           UserNeedVersion[]
   designInputVersions        DesignInputVersion[]
   designOutputVersions       DesignOutputVersion[]
@@ -239,6 +265,7 @@ model TraceItem {
   @@index([itemType])
   @@index([status])
   @@index([folderId])
+  @@index([productId])
   @@map("trace_items")
 }
 
@@ -262,14 +289,39 @@ model Folder {
   createdBy      User        @relation(fields: [createdById], references: [id])
   createdAt      DateTime    @default(now())
 
+  // Null for item types outside PRODUCT_SCOPED_TYPES (see Product's header comment).
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
   @@index([itemType])
   @@index([parentFolderId])
+  @@index([productId])
   @@map("folders")
 }
 
 // ---------- Per-type append-only version tables ----------
 // Rows here are never updated or deleted by the application — an edit always
 // inserts a new version and bumps TraceItem.currentVersionNo.
+
+model DesignPlanVersion {
+  id                             String    @id @default(uuid())
+  traceItemId                    String
+  traceItem                      TraceItem @relation(fields: [traceItemId], references: [id])
+  versionNumber                  Int
+  scope                          String
+  designStages                   String
+  reviewScheduleAndMethods       String
+  responsibilitiesAndAuthorities String
+  interfaceManagement            String?
+  transferPlan                   String?
+  targetCompletionDate           DateTime?
+  createdById                    String
+  createdBy                      User      @relation(fields: [createdById], references: [id])
+  createdAt                      DateTime  @default(now())
+
+  @@unique([traceItemId, versionNumber])
+  @@map("design_plan_versions")
+}
 
 model UserNeedVersion {
   id            String    @id @default(uuid())

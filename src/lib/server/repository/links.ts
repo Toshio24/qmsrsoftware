@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/server/db";
 import { AuditAction, ItemType, LinkStatus, LinkType } from "@/generated/prisma/enums";
 import { isValidLink } from "@/lib/domain/linkRules";
+import { isProductScopedType } from "@/lib/domain/itemTypes";
 import { writeAuditLog, type Actor } from "@/lib/server/audit";
 
 export type AddLinkResult =
@@ -27,6 +28,13 @@ export async function addTraceLink(
   }
   if (!isValidLink(linkType, sourceItem.itemType, targetItem.itemType)) {
     return { success: false, error: "That relationship isn't valid between these item types." };
+  }
+  if (
+    isProductScopedType(sourceItem.itemType) &&
+    isProductScopedType(targetItem.itemType) &&
+    sourceItem.productId !== targetItem.productId
+  ) {
+    return { success: false, error: "These items belong to different products and can't be linked." };
   }
 
   const existing = await db.traceLink.findFirst({

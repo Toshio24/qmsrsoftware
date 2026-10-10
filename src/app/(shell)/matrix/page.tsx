@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
+import { getCurrentProduct } from "@/lib/auth/currentProduct";
 import { getMatrixItems, getMatrixLinks, computeConnectedIds } from "@/lib/server/repository/matrix";
 import { itemTypeRegistry, itemTypeBySlug } from "@/lib/domain/itemTypes";
 import { ItemType } from "@/generated/prisma/enums";
@@ -21,11 +22,14 @@ export default async function MatrixPage({
 
   const typeConfig = typeSlug ? itemTypeBySlug.get(typeSlug) : undefined;
   const typeFilter: ItemType | undefined = typeConfig?.type;
+  const product = await getCurrentProduct();
 
-  // Always load the full unfiltered graph — the type filter and focus mode
-  // are both applied in JS below, since a focus chain can span item types
-  // outside whatever type filter happens to be selected.
-  const [allItems, allLinks] = await Promise.all([getMatrixItems(), getMatrixLinks()]);
+  // Always load the full unfiltered graph (beyond the product scope) — the
+  // type filter and focus mode are both applied in JS below, since a focus
+  // chain can span item types outside whatever type filter happens to be
+  // selected. The product scope itself (current product's scoped records +
+  // every shared Quality Operations record) is applied in the query.
+  const [allItems, allLinks] = await Promise.all([getMatrixItems(undefined, product?.id), getMatrixLinks()]);
 
   let items = typeFilter ? allItems.filter((i) => i.itemType === typeFilter) : allItems;
   let links = allLinks;
@@ -43,7 +47,14 @@ export default async function MatrixPage({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Trace Matrix</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Trace Matrix</h1>
+            {product && (
+              <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-neutral-100 dark:text-neutral-900">
+                {product.name}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-neutral-500">
             {focus
               ? `Showing the full upstream/downstream chain for the focused item (${items.length} item${items.length === 1 ? "" : "s"}).`

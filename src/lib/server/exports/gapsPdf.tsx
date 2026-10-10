@@ -14,14 +14,14 @@ const styles = StyleSheet.create({
   gapCode: { width: 60, fontFamily: "Courier" },
 });
 
-export async function renderGapsPdf(): Promise<Buffer> {
-  const results = await computeCoverageGaps();
+export async function renderGapsPdf(product?: { id: string; name: string }): Promise<Buffer> {
+  const results = await computeCoverageGaps(product?.id);
   const overall = summarizeCoverage(results);
 
   const doc = (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.title}>QMS Coverage Gap Report</Text>
+        <Text style={styles.title}>QMS Coverage Gap Report{product ? ` — ${product.name}` : ""}</Text>
         <Text style={styles.subtitle}>
           Generated {new Date().toLocaleString()} · Overall coverage {overall.percent}% (
           {overall.covered}/{overall.total})

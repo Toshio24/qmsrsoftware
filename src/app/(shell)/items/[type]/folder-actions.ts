@@ -2,8 +2,9 @@
 
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
+import { getItemTypeConfigBySlug, isProductScopedType } from "@/lib/domain/itemTypes";
 import { requireUser } from "@/lib/auth/session";
+import { getCurrentProductId } from "@/lib/auth/currentProduct";
 import {
   createFolder,
   deleteFolder,
@@ -28,8 +29,9 @@ export async function createFolderAction(
   const user = await requireUser();
   const config = requireConfig(slug);
   const name = (formData.get("name") as string) ?? "";
+  const productId = isProductScopedType(config.type) ? await getCurrentProductId() : null;
 
-  const result = await createFolder(config.type, name, currentFolderId, user);
+  const result = await createFolder(config.type, name, currentFolderId, user, productId);
   if (!result.success) return { error: result.error };
 
   revalidatePath(`/items/${slug}`);

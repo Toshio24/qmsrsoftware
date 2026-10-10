@@ -21,6 +21,7 @@ function extractAttachments(formData: FormData) {
 export async function createItemAction(
   slug: string,
   folderId: string | null,
+  productId: string | null,
   _prevState: ItemFormState,
   formData: FormData
 ): Promise<ItemFormState> {
@@ -28,19 +29,22 @@ export async function createItemAction(
   const config = getItemTypeConfigBySlug(slug);
   if (!config) notFound();
 
-  // A folder id from another item type (or a stale/bad one) is treated as
-  // unfiled rather than erroring — folders are scoped per item type.
+  // A folder id from another item type/product (or a stale/bad one) is
+  // treated as unfiled rather than erroring — folders are scoped per item
+  // type and, for product-scoped types, per product too.
   let targetFolderId: string | null = null;
   if (folderId) {
     const folder = await getFolder(folderId);
-    if (folder && folder.itemType === config.type) targetFolderId = folder.id;
+    if (folder && folder.itemType === config.type && folder.productId === productId) {
+      targetFolderId = folder.id;
+    }
   }
 
   const parsed = parseItemForm(config, formData);
   if (!parsed.success) return { error: parsed.error };
 
   const attachments = extractAttachments(formData);
-  const item = await createItem(config.type, parsed.data, user, attachments, targetFolderId);
+  const item = await createItem(config.type, parsed.data, user, attachments, targetFolderId, productId);
 
   const linkType = formData.get("linkType") as LinkType | null;
   const targetItemId = formData.get("targetItemId") as string | null;

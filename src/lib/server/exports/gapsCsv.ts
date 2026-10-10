@@ -2,8 +2,8 @@ import "server-only";
 import { stringify } from "csv-stringify/sync";
 import { computeCoverageGaps } from "@/lib/server/repository/gaps";
 
-export async function buildGapsCsv(): Promise<string> {
-  const results = await computeCoverageGaps();
+export async function buildGapsCsv(productId?: string): Promise<string> {
+  const results = await computeCoverageGaps(productId);
 
   const rows = results.map(({ rule, total, gapItems }) => ({
     Rule: rule.label,

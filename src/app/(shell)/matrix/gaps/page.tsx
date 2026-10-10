@@ -1,20 +1,29 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
+import { getCurrentProduct } from "@/lib/auth/currentProduct";
 import { computeCoverageGaps, summarizeCoverage } from "@/lib/server/repository/gaps";
 import { getItemTypeConfig } from "@/lib/domain/itemTypes";
 import { CoverageMeter } from "@/components/coverage-meter";
 
 export default async function MatrixGapsPage() {
   await requireUser();
+  const product = await getCurrentProduct();
 
-  const results = await computeCoverageGaps();
+  const results = await computeCoverageGaps(product?.id);
   const overall = summarizeCoverage(results);
 
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Coverage Gaps</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Coverage Gaps</h1>
+            {product && (
+              <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-neutral-100 dark:text-neutral-900">
+                {product.name}
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-neutral-500">
             Classic design-control checks — an item is &ldquo;covered&rdquo; if at least one
             active trace link of the required type points at it.{" "}

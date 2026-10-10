@@ -4,6 +4,7 @@ import { getCurrentVersionsForItems, listItemSummaries } from "@/lib/server/repo
 import { getLinkRulesForSourceType, linkRules } from "@/lib/domain/linkRules";
 import { getItemTypeConfig, itemTypeByType } from "@/lib/domain/itemTypes";
 import { formatFieldValue, statusBadgeClasses } from "@/lib/domain/formatField";
+import { getCurrentProductId } from "@/lib/auth/currentProduct";
 import type { ItemType } from "@/generated/prisma/enums";
 import { AddLinkForm } from "./add-link-form";
 import { addLinkAction, removeLinkAction } from "./link-actions";
@@ -16,10 +17,15 @@ export async function LinksSection({
   slug,
   traceItemId,
   itemType,
+  productId,
 }: {
   slug: string;
   traceItemId: string;
   itemType: ItemType;
+  /** This item's own product (null for unscoped types) — used to restrict
+   * link candidates to the same product, falling back to whichever product
+   * is currently selected when this item itself isn't product-scoped. */
+  productId: string | null;
 }) {
   const [links, sourceRules] = await Promise.all([
     getLinksForItem(traceItemId),
@@ -34,10 +40,11 @@ export async function LinksSection({
     }))
   );
 
+  const candidateProductId = productId ?? (await getCurrentProductId()) ?? undefined;
   const targetTypesNeeded = Array.from(new Set(sourceRules.flatMap((r) => r.targetTypes)));
   const candidates =
     targetTypesNeeded.length > 0
-      ? await listItemSummaries(targetTypesNeeded, traceItemId)
+      ? await listItemSummaries(targetTypesNeeded, traceItemId, candidateProductId)
       : [];
 
   const candidateItemsByType: Record<

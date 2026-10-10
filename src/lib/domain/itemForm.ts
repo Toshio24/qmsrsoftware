@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { FieldConfig, ItemTypeConfig } from "./itemTypes";
+import { computedFieldResolvers, type FieldConfig, type ItemTypeConfig } from "./itemTypes";
 import { normalizeUrl } from "./url";
 
 function zodForField(field: FieldConfig): z.ZodTypeAny {
@@ -17,9 +17,13 @@ function zodForField(field: FieldConfig): z.ZodTypeAny {
         ? z.string().min(1, `${field.label} is required.`)
         : z.string().optional();
     case "number":
+      // Note: literal("") must come first — z.coerce.number() happily
+      // coerces "" to 0 (Number("") === 0) rather than failing, so if it ran
+      // first in the union an untouched optional field would silently save
+      // as 0 instead of staying null.
       return field.required
         ? z.coerce.number({ error: `${field.label} must be a number.` })
-        : z.union([z.coerce.number(), z.literal("")]).optional();
+        : z.union([z.literal(""), z.coerce.number()]).optional();
     case "date":
       return field.required
         ? z.coerce.date({ error: `${field.label} is required.` })
@@ -32,19 +36,23 @@ function zodForField(field: FieldConfig): z.ZodTypeAny {
 export function buildItemSchema(config: ItemTypeConfig) {
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of config.fields) {
+    if (field.computed) continue; // derived after parsing, never submitted
     shape[field.key] = zodForField(field);
   }
   return z.object(shape);
 }
 
 /** Pulls raw values out of FormData according to the field config, handling
- * checkboxes (absent when unchecked) and blank-optional numbers/dates. */
+ * checkboxes (absent when unchecked) and blank-optional numbers/dates.
+ * Computed fields (see FieldConfig.computed) aren't rendered as inputs, so
+ * they're never read from the submitted form here. */
 export function extractFormValues(
   config: ItemTypeConfig,
   formData: FormData
 ): Record<string, unknown> {
   const raw: Record<string, unknown> = {};
   for (const field of config.fields) {
+    if (field.computed) continue;
     if (field.kind === "boolean") {
       raw[field.key] = formData.get(field.key) === "on";
     } else {
@@ -70,8 +78,18 @@ export function parseItemForm(config: ItemTypeConfig, formData: FormData): Parse
 
   const data: Record<string, unknown> = {};
   for (const field of config.fields) {
+    if (field.computed) continue;
     const value = result.data[field.key];
     data[field.key] = value === "" ? null : value;
+  }
+  // Second pass: computed fields derive from the already-normalized values
+  // above (so e.g. a severity select's "3" has already become the number 3).
+  // The resolvers themselves live outside FieldConfig (see
+  // computedFieldResolvers in itemTypes.ts) so this module's functions never
+  // have to cross into a Client Component as a prop.
+  const resolvers = computedFieldResolvers[config.type] ?? {};
+  for (const field of config.fields) {
+    if (field.computed) data[field.key] = resolvers[field.key]?.compute(data) ?? null;
   }
   return { success: true, data };
 }

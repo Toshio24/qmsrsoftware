@@ -3,12 +3,15 @@ import { ArrowLeft, ExternalLink, GitBranch } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getItemTypeConfigBySlug } from "@/lib/domain/itemTypes";
 import { getItemWithCurrentVersion } from "@/lib/server/repository/items";
+import { getProduct } from "@/lib/server/repository/products";
 import { requireUser } from "@/lib/auth/session";
 import { formatFieldValue, statusBadgeClasses } from "@/lib/domain/formatField";
+import { ItemType } from "@/generated/prisma/enums";
 import { StatusSelectForm } from "./status-select-form";
 import { LinksSection } from "./links-section";
 import { SignaturesSection } from "./signatures-section";
 import { AttachmentsSection } from "./attachments-section";
+import { RISK_SCORE_FIELD_KEYS, RiskAssessmentPanel } from "./risk-assessment-panel";
 
 export default async function ItemDetailPage({
   params,
@@ -25,6 +28,14 @@ export default async function ItemDetailPage({
   const { item, version } = result;
   const Icon = config.icon;
   const backHref = item.folderId ? `/items/${slug}?folder=${item.folderId}` : `/items/${slug}`;
+  const product = item.productId ? await getProduct(item.productId) : null;
+
+  // Risk Analysis shows severity/probability/RPN in the dedicated
+  // RiskAssessmentPanel below instead of the generic field list.
+  const detailFields =
+    config.type === ItemType.RISK_ITEM
+      ? config.fields.filter((field) => !(RISK_SCORE_FIELD_KEYS as readonly string[]).includes(field.key))
+      : config.fields;
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -42,7 +53,14 @@ export default async function ItemDetailPage({
             <Icon className="h-5 w-5" />
           </span>
           <div>
-            <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-xs text-neutral-500">{item.humanCode}</p>
+              {product && (
+                <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white dark:bg-neutral-100 dark:text-neutral-900">
+                  {product.name}
+                </span>
+              )}
+            </div>
             <h1 className="mt-1 text-2xl font-semibold">{item.title}</h1>
             <p className="mt-1 text-sm text-neutral-500">
               {config.label} · version {item.currentVersionNo} · created by{" "}
@@ -77,8 +95,10 @@ export default async function ItemDetailPage({
         </div>
       </div>
 
+      {config.type === ItemType.RISK_ITEM && <RiskAssessmentPanel version={version} />}
+
       <dl className="flex flex-col gap-4">
-        {config.fields.map((field) => {
+        {detailFields.map((field) => {
           const rawValue = version[field.key];
           return (
             <div key={field.key}>
@@ -120,7 +140,7 @@ export default async function ItemDetailPage({
       </div>
 
       <div className="border-t border-neutral-200 pt-6 dark:border-neutral-800">
-        <LinksSection slug={slug} traceItemId={item.id} itemType={config.type} />
+        <LinksSection slug={slug} traceItemId={item.id} itemType={config.type} productId={item.productId} />
       </div>
     </div>
   );

@@ -32,8 +32,8 @@ function pushTo(map: Map<string, string[]>, key: string, value: string) {
   else map.set(key, [value]);
 }
 
-export async function renderMatrixPdf(): Promise<Buffer> {
-  const [items, links] = await Promise.all([getMatrixItems(), getMatrixLinks()]);
+export async function renderMatrixPdf(product?: { id: string; name: string }): Promise<Buffer> {
+  const [items, links] = await Promise.all([getMatrixItems(undefined, product?.id), getMatrixLinks()]);
 
   const linksByItem = new Map<string, string[]>();
   for (const link of links) {
@@ -43,7 +43,7 @@ export async function renderMatrixPdf(): Promise<Buffer> {
   const doc = (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <Text style={styles.title}>QMS Trace Matrix</Text>
+        <Text style={styles.title}>QMS Trace Matrix{product ? ` — ${product.name}` : ""}</Text>
         <Text style={styles.subtitle}>Generated {new Date().toLocaleString()} · {items.length} items</Text>
 
         <View style={styles.headerRow}>

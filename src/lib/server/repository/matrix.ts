@@ -3,9 +3,18 @@ import { db } from "@/lib/server/db";
 import { getAllActiveLinks } from "./links";
 import { ItemType } from "@/generated/prisma/enums";
 
-export async function getMatrixItems(typeFilter?: ItemType) {
+/**
+ * `productId`, when given, restricts the result to that product's scoped
+ * items plus every unscoped (Quality Operations) item — the same "current
+ * product + shared QMS records" rule used for link candidates
+ * (see listItemSummaries). Omit it to see everything regardless of product.
+ */
+export async function getMatrixItems(typeFilter?: ItemType, productId?: string) {
   return db.traceItem.findMany({
-    where: typeFilter ? { itemType: typeFilter } : undefined,
+    where: {
+      ...(typeFilter ? { itemType: typeFilter } : {}),
+      ...(productId ? { OR: [{ productId }, { productId: null }] } : {}),
+    },
     orderBy: { humanCode: "asc" },
   });
 }

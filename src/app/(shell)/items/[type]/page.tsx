@@ -12,7 +12,10 @@ import {
 } from "@/lib/server/repository/folders";
 import { getLinkedTargetsByType } from "@/lib/server/repository/links";
 import { requireUser } from "@/lib/auth/session";
+import { getCurrentProduct } from "@/lib/auth/currentProduct";
+import { isProductScopedType } from "@/lib/domain/itemTypes";
 import { cn } from "@/lib/utils";
+import { classifyRisk } from "@/lib/domain/riskMatrix";
 import { BoardView } from "./board-view";
 import { GridView } from "./grid-view";
 import { FolderBrowser } from "./folder-browser";
@@ -52,12 +55,19 @@ export default async function ItemTypeListPage({
     : null;
   const sortDir: "asc" | "desc" = dirParam === "desc" ? "desc" : "asc";
 
-  // A folder id from another item type (or a stale/bad one) is treated as
-  // root rather than erroring — folders are scoped per item type.
+  const scoped = isProductScopedType(config.type);
+  const product = scoped ? await getCurrentProduct() : null;
+  const productId = product?.id ?? null;
+
+  // A folder id from another item type or product (or a stale/bad one) is
+  // treated as root rather than erroring — folders are scoped per item type
+  // and, for product-scoped types, per product too.
   let currentFolderId: string | null = null;
   if (folderParam) {
     const folder = await getFolder(folderParam);
-    if (folder && folder.itemType === config.type) currentFolderId = folder.id;
+    if (folder && folder.itemType === config.type && folder.productId === productId) {
+      currentFolderId = folder.id;
+    }
   }
 
   let listContent: React.ReactNode;
@@ -66,11 +76,14 @@ export default async function ItemTypeListPage({
 
   if (view === "list") {
     const [subfolders, rows, folderPath, allFoldersFlat, retiredHiddenCount] = await Promise.all([
-      getFolderChildren(config.type, currentFolderId),
-      listItemsWithCurrentVersion(config.type, currentFolderId, { includeRetired: showRetired }),
+      getFolderChildren(config.type, currentFolderId, scoped ? productId : undefined),
+      listItemsWithCurrentVersion(config.type, currentFolderId, {
+        includeRetired: showRetired,
+        productId: scoped ? productId : undefined,
+      }),
       currentFolderId ? getFolderPath(currentFolderId) : Promise.resolve([]),
-      getFoldersFlatForType(config.type),
-      countRetiredItems(config.type, currentFolderId),
+      getFoldersFlatForType(config.type, scoped ? productId : undefined),
+      countRetiredItems(config.type, currentFolderId, scoped ? productId : undefined),
     ]);
     totalCount = rows.length + subfolders.length;
     retiredCount = retiredHiddenCount;
@@ -85,11 +98,19 @@ export default async function ItemTypeListPage({
       ? await getLinkedTargetsByType(rows.map(({ item }) => item.id), ItemType.USER_NEED)
       : new Map<string, { id: string; humanCode: string }[]>();
 
+    const showAcceptabilityColumn = config.type === ItemType.RISK_ITEM;
+
     let listItems = rows.map(({ item, version }) => ({
       id: item.id,
       humanCode: item.humanCode,
       title: (version?.[config.titleField] as string | undefined) || item.title,
       status: item.status,
+      acceptability: showAcceptabilityColumn
+        ? classifyRisk(
+            version?.severityInitial as number | null,
+            version?.probabilityInitial as number | null
+          )
+        : undefined,
     }));
 
     if (sortColumn) {
@@ -127,6 +148,7 @@ export default async function ItemTypeListPage({
         linkedColumnLabel={linksToUserNeeds ? itemTypeByType.get(ItemType.USER_NEED)?.label : undefined}
         linkedColumnSlug={itemTypeByType.get(ItemType.USER_NEED)?.slug}
         linkedItemsByItemId={Object.fromEntries(linkedUserNeedsByItemId)}
+        showAcceptabilityColumn={showAcceptabilityColumn}
         sortColumn={sortColumn}
         sortDir={sortDir}
         sortHrefs={sortHrefs}
@@ -134,8 +156,11 @@ export default async function ItemTypeListPage({
     );
   } else {
     const [rows, retiredHiddenCount] = await Promise.all([
-      listItemsWithCurrentVersion(config.type, undefined, { includeRetired: showRetired }),
-      countRetiredItems(config.type),
+      listItemsWithCurrentVersion(config.type, undefined, {
+        includeRetired: showRetired,
+        productId: scoped ? productId : undefined,
+      }),
+      countRetiredItems(config.type, undefined, scoped ? productId : undefined),
     ]);
     totalCount = rows.length;
     retiredCount = retiredHiddenCount;
@@ -155,7 +180,14 @@ export default async function ItemTypeListPage({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{config.pluralLabel}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">{config.pluralLabel}</h1>
+            {product && (
+              <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-neutral-100 dark:text-neutral-900">
+                {product.name}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-neutral-500">
             {totalCount} item{totalCount === 1 ? "" : "s"}
             {retiredCount > 0 && (

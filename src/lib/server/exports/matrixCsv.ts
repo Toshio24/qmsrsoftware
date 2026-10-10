@@ -9,8 +9,8 @@ function pushTo(map: Map<string, string[]>, key: string, value: string) {
   else map.set(key, [value]);
 }
 
-export async function buildMatrixCsv(): Promise<string> {
-  const [items, links] = await Promise.all([getMatrixItems(), getMatrixLinks()]);
+export async function buildMatrixCsv(productId?: string): Promise<string> {
+  const [items, links] = await Promise.all([getMatrixItems(undefined, productId), getMatrixLinks()]);
 
   const outgoingByItem = new Map<string, string[]>();
   const incomingByItem = new Map<string, string[]>();

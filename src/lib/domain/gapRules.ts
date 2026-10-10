@@ -38,4 +38,19 @@ export const gapRules: GapRule[] = [
     requiredIncomingLinkType: LinkType.MITIGATES,
     label: "Risks with no mitigating control",
   },
+  {
+    itemType: ItemType.USER_NEED,
+    requiredIncomingLinkType: LinkType.GOVERNS,
+    label: "User needs not governed by a Design & Development Plan",
+  },
+  {
+    itemType: ItemType.DESIGN_INPUT,
+    requiredIncomingLinkType: LinkType.GOVERNS,
+    label: "Design inputs not governed by a Design & Development Plan",
+  },
+  {
+    itemType: ItemType.DESIGN_OUTPUT,
+    requiredIncomingLinkType: LinkType.GOVERNS,
+    label: "Design outputs not governed by a Design & Development Plan",
+  },
 ];

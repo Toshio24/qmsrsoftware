@@ -7,6 +7,7 @@ import { FilePlus, Folder as FolderIcon, FolderPlus, Pencil, Trash2 } from "luci
 import { useActionState } from "react";
 import { cn } from "@/lib/utils";
 import { statusBadgeClasses } from "@/lib/domain/formatField";
+import { ACCEPTABILITY_BADGE_CLASSES, ACCEPTABILITY_LABEL, type RiskAcceptability } from "@/lib/domain/riskMatrix";
 import {
   createFolderAction,
   deleteFolderAction,
@@ -17,7 +18,15 @@ import {
 
 type FolderNode = { id: string; name: string };
 type FlatFolder = { id: string; name: string; depth: number };
-type ItemNode = { id: string; humanCode: string; title: string; status: string };
+type ItemNode = {
+  id: string;
+  humanCode: string;
+  title: string;
+  status: string;
+  /** Risk Analysis only — the initial-risk acceptability verdict, for an
+   * optional extra column (see `acceptabilityColumnLabel` below). */
+  acceptability?: RiskAcceptability | null;
+};
 
 function NewFolderForm({
   action,
@@ -198,6 +207,7 @@ export function FolderBrowser({
   linkedColumnLabel,
   linkedColumnSlug,
   linkedItemsByItemId,
+  showAcceptabilityColumn = false,
   sortColumn = null,
   sortDir = "asc",
   sortHrefs,
@@ -215,6 +225,8 @@ export function FolderBrowser({
   /** slug for the linked item type, to build links to it (e.g. "user-needs"). */
   linkedColumnSlug?: string;
   linkedItemsByItemId?: Record<string, { id: string; humanCode: string }[]>;
+  /** Risk Analysis only — shows each item's initial-risk acceptability. */
+  showAcceptabilityColumn?: boolean;
   sortColumn?: SortColumn | null;
   sortDir?: "asc" | "desc";
   /** Precomputed hrefs (server-built — functions can't cross to a Client
@@ -380,6 +392,9 @@ export function FolderBrowser({
                 {linkedColumnLabel && (
                   <th className="whitespace-nowrap px-3 py-2">{linkedColumnLabel}</th>
                 )}
+                {showAcceptabilityColumn && (
+                  <th className="whitespace-nowrap px-3 py-2">Acceptability</th>
+                )}
                 {sortHrefs ? (
                   <SortableHeader
                     label="Status"
@@ -430,6 +445,19 @@ export function FolderBrowser({
                           </span>
                         ));
                       })()}
+                    </td>
+                  )}
+                  {showAcceptabilityColumn && (
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {item.acceptability ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${ACCEPTABILITY_BADGE_CLASSES[item.acceptability]}`}
+                        >
+                          {ACCEPTABILITY_LABEL[item.acceptability]}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-neutral-400">Not yet assessed</span>
+                      )}
                     </td>
                   )}
                   <td className="px-3 py-2">

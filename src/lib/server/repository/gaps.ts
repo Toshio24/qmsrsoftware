@@ -8,8 +8,8 @@ export type GapResult = {
   gapItems: { id: string; humanCode: string; title: string }[];
 };
 
-export async function computeCoverageGaps(): Promise<GapResult[]> {
-  const [allItems, allLinks] = await Promise.all([getMatrixItems(), getMatrixLinks()]);
+export async function computeCoverageGaps(productId?: string): Promise<GapResult[]> {
+  const [allItems, allLinks] = await Promise.all([getMatrixItems(undefined, productId), getMatrixLinks()]);
 
   const coverageKey = (targetId: string, linkType: string) => `${targetId}:${linkType}`;
   const covered = new Set(allLinks.map((l) => coverageKey(l.targetItemId, l.linkType)));

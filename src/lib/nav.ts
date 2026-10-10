@@ -1,4 +1,5 @@
 import {
+  Boxes,
   Download,
   GitBranch,
   LayoutDashboard,
@@ -8,8 +9,8 @@ import {
   Users as UsersIcon,
   type LucideIcon,
 } from "lucide-react";
-import { UserRole } from "@/generated/prisma/enums";
-import { itemTypeRegistry } from "@/lib/domain/itemTypes";
+import { ItemType, UserRole } from "@/generated/prisma/enums";
+import { DESIGN_CONTROL_TYPES, RISK_MANAGEMENT_TYPES, itemTypeRegistry } from "@/lib/domain/itemTypes";
 
 export type NavItem = {
   label: string;
@@ -23,16 +24,17 @@ export type NavSection = {
   items: NavItem[];
 };
 
-// The registry is defined in design-control order first, then the newer
-// quality-operations modules — split the nav on that same boundary.
-const DESIGN_CONTROL_TYPE_COUNT = 8;
+function navItemsFor(types: ItemType[]): NavItem[] {
+  return itemTypeRegistry
+    .filter((config) => types.includes(config.type))
+    .map((config) => ({ label: config.pluralLabel, href: `/items/${config.slug}`, icon: config.icon }));
+}
 
-const designControlItems: NavItem[] = itemTypeRegistry
-  .slice(0, DESIGN_CONTROL_TYPE_COUNT)
-  .map((config) => ({ label: config.pluralLabel, href: `/items/${config.slug}`, icon: config.icon }));
-
-const qualityOpsItems: NavItem[] = itemTypeRegistry
-  .slice(DESIGN_CONTROL_TYPE_COUNT)
+const designControlItems = navItemsFor(DESIGN_CONTROL_TYPES);
+const riskManagementItems = navItemsFor(RISK_MANAGEMENT_TYPES);
+const coveredTypes = new Set([...DESIGN_CONTROL_TYPES, ...RISK_MANAGEMENT_TYPES]);
+const qualityOpsItems = itemTypeRegistry
+  .filter((config) => !coveredTypes.has(config.type))
   .map((config) => ({ label: config.pluralLabel, href: `/items/${config.slug}`, icon: config.icon }));
 
 export const navSections: NavSection[] = [
@@ -41,8 +43,12 @@ export const navSections: NavSection[] = [
     items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
   },
   {
-    title: "Design & Risk",
+    title: "Design Control",
     items: designControlItems,
+  },
+  {
+    title: "Risk Management",
+    items: riskManagementItems,
   },
   {
     title: "Quality Operations",
@@ -70,6 +76,7 @@ export const navSections: NavSection[] = [
     title: "Admin",
     items: [
       { label: "Users", href: "/admin/users", icon: UsersIcon, roles: [UserRole.ADMIN] },
+      { label: "Products", href: "/admin/products", icon: Boxes, roles: [UserRole.ADMIN] },
       { label: "Settings", href: "/admin/settings", icon: Settings, roles: [UserRole.ADMIN] },
     ],
   },

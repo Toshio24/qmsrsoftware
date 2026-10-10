@@ -91,6 +91,20 @@ export const linkRules: LinkRule[] = [
     targetTypes: [ItemType.EQUIPMENT],
   },
   {
+    linkType: LinkType.GOVERNS,
+    label: "governs",
+    sourceTypes: [ItemType.DESIGN_PLAN],
+    targetTypes: [
+      ItemType.USER_NEED,
+      ItemType.DESIGN_INPUT,
+      ItemType.DESIGN_OUTPUT,
+      ItemType.RISK_ITEM,
+      ItemType.VERIFICATION_TEST,
+      ItemType.VALIDATION_TEST,
+      ItemType.CONTROLLED_DOCUMENT,
+    ],
+  },
+  {
     linkType: LinkType.REFERENCES,
     label: "references",
     sourceTypes: ALL_TYPES,

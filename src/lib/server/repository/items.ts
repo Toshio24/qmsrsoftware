@@ -4,6 +4,7 @@ import { ItemType, ItemStatus, AuditAction } from "@/generated/prisma/enums";
 import { getItemTypeConfig, deriveTitle } from "@/lib/domain/itemTypes";
 import { writeAuditLog, type Actor } from "@/lib/server/audit";
 import { createAttachmentInTx } from "./attachments";
+import { createCustomFieldInTx } from "./customFields";
 
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 type DbOrTx = typeof db | TxClient;
@@ -21,6 +22,7 @@ type VersionDelegate = { create: Function; findMany: Function };
  * lib/domain/itemForm.ts) before it gets here.
  */
 const versionDelegateByType: Record<ItemType, (client: DbOrTx) => VersionDelegate> = {
+  DESIGN_PLAN: (client) => client.designPlanVersion,
   USER_NEED: (client) => client.userNeedVersion,
   DESIGN_INPUT: (client) => client.designInputVersion,
   DESIGN_OUTPUT: (client) => client.designOutputVersion,
@@ -112,7 +114,9 @@ export async function createItem(
   data: Record<string, unknown>,
   actor: Actor,
   attachments: { name: string; url: string }[] = [],
-  folderId: string | null = null
+  folderId: string | null = null,
+  productId: string | null = null,
+  customFields: { label: string; value: string }[] = []
 ) {
   const config = getItemTypeConfig(type);
   const title = deriveTitle(config, data);
@@ -135,7 +139,7 @@ export async function createItem(
     }
 
     const traceItem = await tx.traceItem.create({
-      data: { itemType: type, humanCode, title, createdById: actor.id, folderId },
+      data: { itemType: type, humanCode, title, createdById: actor.id, folderId, productId },
     });
 
     if (designInputSlot) {
@@ -158,6 +162,10 @@ export async function createItem(
 
     for (const attachment of attachments) {
       await createAttachmentInTx(tx, traceItem.id, attachment.name, attachment.url, actor);
+    }
+
+    for (const field of customFields) {
+      await createCustomFieldInTx(tx, traceItem.id, field.label, field.value, actor);
     }
 
     return traceItem;
@@ -222,13 +230,14 @@ export async function createItemVersion(
 export async function listItemsWithCurrentVersion(
   type: ItemType,
   folderId?: string | null,
-  { includeRetired = false }: { includeRetired?: boolean } = {}
+  { includeRetired = false, productId }: { includeRetired?: boolean; productId?: string | null } = {}
 ) {
   const items = await db.traceItem.findMany({
     where: {
       itemType: type,
       ...(folderId !== undefined ? { folderId } : {}),
       ...(includeRetired ? {} : { status: { not: ItemStatus.RETIRED } }),
+      ...(productId !== undefined ? { productId } : {}),
     },
     orderBy: { createdAt: "desc" },
     include: { createdBy: true },
@@ -254,12 +263,17 @@ export async function listItemsWithCurrentVersion(
 }
 
 /** Count of RETIRED items hidden by the default view, for a "show retired" toggle. */
-export async function countRetiredItems(type: ItemType, folderId?: string | null) {
+export async function countRetiredItems(
+  type: ItemType,
+  folderId?: string | null,
+  productId?: string | null
+) {
   return db.traceItem.count({
     where: {
       itemType: type,
       status: ItemStatus.RETIRED,
       ...(folderId !== undefined ? { folderId } : {}),
+      ...(productId !== undefined ? { productId } : {}),
     },
   });
 }
@@ -283,13 +297,20 @@ export async function getDistinctFieldValues(type: ItemType, fieldKey: string): 
 
 /** Lightweight item list for populating link-target pickers. Retired items
  * are excluded — linking to something no longer active isn't useful and
- * would just add clutter to the dropdown. */
-export async function listItemSummaries(types: ItemType[], excludeId?: string) {
+ * would just add clutter to the dropdown.
+ *
+ * `productId`, when given, restricts product-scoped candidates to that one
+ * product while still including every unscoped (Quality Operations) item —
+ * e.g. a CAPA can still address a Risk Analysis, but only the current
+ * product's Risk Analyses show up as candidates. Omit it to show everything
+ * regardless of product. */
+export async function listItemSummaries(types: ItemType[], excludeId?: string, productId?: string) {
   return db.traceItem.findMany({
     where: {
       itemType: { in: types },
       status: { not: ItemStatus.RETIRED },
       ...(excludeId ? { id: { not: excludeId } } : {}),
+      ...(productId ? { OR: [{ productId }, { productId: null }] } : {}),
     },
     select: {
       id: true,

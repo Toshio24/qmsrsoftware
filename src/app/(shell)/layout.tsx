@@ -3,13 +3,20 @@ import { redirect } from "next/navigation";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { LogoutButton } from "@/components/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ProductSwitcher } from "@/components/product-switcher";
 import { requireUser } from "@/lib/auth/session";
+import { getCurrentProductId, listProducts } from "@/lib/auth/currentProduct";
 
 export default async function ShellLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const user = await requireUser();
   if (user.forcePasswordReset) redirect("/change-password");
+
+  const [products, currentProductId] = await Promise.all([
+    listProducts(),
+    getCurrentProductId(),
+  ]);
 
   return (
     <div className="flex min-h-screen bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
@@ -23,6 +30,7 @@ export default async function ShellLayout({
             <p className="mt-1 text-xs text-neutral-500">
               {user.fullName} · {user.role}
             </p>
+            <ProductSwitcher products={products} currentProductId={currentProductId} />
             <div className="mt-2">
               <LogoutButton />
             </div>
